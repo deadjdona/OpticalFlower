@@ -14,6 +14,7 @@ A complete optical flow-based position stabilization system for the Betafly dron
 
 - **Optical Flow Sensing**: Multiple sensor options for precise motion tracking
 - **Position Hold**: Maintains GPS-free position hold using visual odometry
+- **GPS Emulation**: Pi acts as GPS module for flight controller via UART 📡
 - **Visual Coordinate System**: Camera-frame position hold (no compass required) 📹
 - **Barometer Integration**: Reads vertical velocity from flight controller for improved accuracy
 - **High Altitude Support**: Works reliably at 30m+ altitude with adaptive algorithms ⬆️
@@ -149,6 +150,15 @@ Edit `config.json` to customize the system for your setup:
     "type": "mavlink",  // Read from flight controller via MAVLink
     "connection": "/dev/ttyAMA0"
   },
+  "gps_emulation": {
+    "enabled": false,  // Enable to make Pi act as GPS module for FC
+    "protocol": "nmea",  // Options: nmea (most FCs), mavlink
+    "port": "/dev/ttyAMA0",  // UART port to FC GPS input
+    "baudrate": 115200,  // Must match FC GPS baudrate
+    "home_lat": 0.0,  // Set to your takeoff location
+    "home_lon": 0.0,
+    "home_alt": 0.0
+  },
   "pid": {
     "position_x": {
       "kp": 0.5,  // Increase for more aggressive position correction
@@ -184,6 +194,34 @@ The web interface provides:
 - Configuration editor
 - Mode switching controls
 - Stick input monitoring
+
+### GPS Emulation Mode 📡
+
+Enable GPS emulation to make the Raspberry Pi act as a GPS module:
+
+```bash
+# Edit config.json
+nano config.json
+
+# Set:
+# "gps_emulation": {
+#   "enabled": true,
+#   "protocol": "nmea",
+#   "port": "/dev/ttyAMA0",
+#   "baudrate": 115200
+# }
+
+# Then start the system
+./betafly_stabilizer_advanced.py
+```
+
+**With GPS emulation enabled:**
+- Pi sends optical flow position as GPS data via UART
+- Flight controller thinks it has GPS connected
+- FC does position hold using standard GPS modes
+- No need for Pi to send pitch/roll corrections
+
+See **[GPS_EMULATION_GUIDE.md](GPS_EMULATION_GUIDE.md)** for complete setup instructions
 
 ### Basic Command Line Usage
 
@@ -422,6 +460,7 @@ controller.hold_current_position(x, y)  # Hold at position
 For detailed information about new features:
 - **[FEATURES.md](FEATURES.md)** - Complete guide to web interface, camera support, and stick inputs
 - **[INSTALL.md](INSTALL.md)** - Installation and setup instructions
+- **[GPS_EMULATION_GUIDE.md](GPS_EMULATION_GUIDE.md)** - GPS emulation for flight controller integration 📡
 - **[CADDX_INFRA256_GUIDE.md](CADDX_INFRA256_GUIDE.md)** - Caddx Infra 256 (I2C) setup guide
 - **[VISUAL_COORDINATES_GUIDE.md](VISUAL_COORDINATES_GUIDE.md)** - Visual coordinates and barometer integration 📹
 - **[HIGH_ALTITUDE_GUIDE.md](HIGH_ALTITUDE_GUIDE.md)** - High altitude operation (30m+) guide ⬆️
@@ -435,6 +474,7 @@ For detailed information about new features:
 - `caddx_infra256.py` - Caddx Infra 256 driver (I2C)
 - `camera_optical_flow.py` - **New!** Camera-based optical flow (USB/CSI/Analog, includes Caddx 256CA)
 - `altitude_source.py` - **New!** Multi-source altitude management (MAVLink, rangefinder, barometer) ⬆️
+- `gps_emulation.py` - **New!** GPS emulation for flight controller (NMEA/MAVLink) 📡
 - `position_stabilizer.py` - PID control with altitude-adaptive algorithms
 - `stick_input.py` - **New!** RC receiver input handling (SBUS/PWM)
 - `web_interface.py` - **New!** Flask web server and API

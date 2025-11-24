@@ -19,6 +19,7 @@ from position_stabilizer import StabilizationController, PIDGains
 from stick_input import StickInput, StickMixer, ModeSwitch
 from web_interface import app, system_state, state_lock, start_web_server
 from altitude_source import create_altitude_source, AltitudeSource
+from gps_emulation import create_gps_emulator, GPSEmulator
 
 # Try to import Caddx Infra 256
 try:
@@ -106,6 +107,17 @@ class BetaflyStabilizerAdvanced:
             except Exception as e:
                 logger.error(f"Failed to initialize altitude source: {e}")
                 self.altitude_source = None
+        
+        # Initialize GPS emulator if enabled
+        self.gps_emulator = None
+        if self.config.get('gps_emulation', {}).get('enabled', False):
+            try:
+                self.gps_emulator = create_gps_emulator(self.config['gps_emulation'])
+                if self.gps_emulator:
+                    logger.info(f"GPS emulator initialized: {type(self.gps_emulator).__name__}")
+            except Exception as e:
+                logger.error(f"Failed to initialize GPS emulator: {e}")
+                self.gps_emulator = None
         
         # Initialize optical flow tracker
         self.tracker = OpticalFlowTracker(
@@ -242,6 +254,15 @@ class BetaflyStabilizerAdvanced:
                 'enabled': True,
                 'host': '0.0.0.0',
                 'port': 8080
+            },
+            'gps_emulation': {
+                'enabled': False,
+                'protocol': 'nmea',
+                'port': '/dev/ttyAMA0',
+                'baudrate': 115200,
+                'home_lat': 0.0,
+                'home_lon': 0.0,
+                'home_alt': 0.0
             }
         }
         
@@ -307,6 +328,10 @@ class BetaflyStabilizerAdvanced:
         # Stop stick input
         if self.stick_input:
             self.stick_input.stop()
+        
+        # Close GPS emulator
+        if self.gps_emulator:
+            self.gps_emulator.close()
         
         # Close log file
         if self.log_file:
@@ -391,8 +416,21 @@ class BetaflyStabilizerAdvanced:
                 system_state['camera_type'] = self.camera_type
                 system_state['last_update'] = time.time()
             
-            # Send corrections to flight controller
-            self._send_corrections(pitch_correction, roll_correction)
+            # Send GPS emulation data to flight controller if enabled
+            if self.gps_emulator:
+                try:
+                    self.gps_emulator.send_position(
+                        pos_x, pos_y, 
+                        self.tracker.get_altitude(),
+                        vel_x, vel_y
+                    )
+                except Exception as e:
+                    if loop_count % 100 == 0:  # Log errors occasionally
+                        logger.error(f"GPS emulation error: {e}")
+            
+            # Send corrections to flight controller (if not using GPS emulation)
+            if not self.gps_emulator:
+                self._send_corrections(pitch_correction, roll_correction)
             
             # Log data
             if self.log_data and loop_count % 10 == 0:
