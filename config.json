@@ -12,7 +12,8 @@
     "scale_factor": 0.001,
     "initial_height": 0.5,
     "max_altitude": 50.0,
-    "comment": "scale_factor converts sensor units to meters, height is in meters, max_altitude is maximum supported altitude for optical flow"
+    "use_visual_coords": true,
+    "comment": "scale_factor converts sensor units to meters, height is in meters, max_altitude is maximum supported altitude. use_visual_coords=true uses camera frame (recommended for position hold)"
   },
   "altitude": {
     "enabled": false,
@@ -24,7 +25,7 @@
     "protocol": "benewake",
     "sensor": "bmp280",
     "i2c_bus": 1,
-    "comment": "Altitude source for high altitude operation. type: static, mavlink, rangefinder, barometer, fused. For 30m+ altitude, use rangefinder or mavlink for best accuracy"
+    "comment": "Altitude source for high altitude operation. type: static, mavlink, rangefinder, barometer, fused. For position hold, enable mavlink to read barometer velocity from flight controller"
   },
   "pid": {
     "position_x": {

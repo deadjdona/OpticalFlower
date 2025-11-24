@@ -14,6 +14,8 @@ A complete optical flow-based position stabilization system for the Betafly dron
 
 - **Optical Flow Sensing**: Multiple sensor options for precise motion tracking
 - **Position Hold**: Maintains GPS-free position hold using visual odometry
+- **Visual Coordinate System**: Camera-frame position hold (no compass required) 📹
+- **Barometer Integration**: Reads vertical velocity from flight controller for improved accuracy
 - **High Altitude Support**: Works reliably at 30m+ altitude with adaptive algorithms ⬆️
 - **Altitude-Adaptive Control**: Automatically adjusts filtering and gains based on altitude
 - **Velocity Damping**: Reduces drift and oscillations during flight
@@ -140,6 +142,12 @@ Edit `config.json` to customize the system for your setup:
   },
   "tracker": {
     "initial_height": 0.5,  // Expected flight height in meters
+    "use_visual_coords": true,  // Use visual coordinate system (recommended)
+  },
+  "altitude": {
+    "enabled": true,  // Enable for barometer velocity from flight controller
+    "type": "mavlink",  // Read from flight controller via MAVLink
+    "connection": "/dev/ttyAMA0"
   },
   "pid": {
     "position_x": {
@@ -415,6 +423,7 @@ For detailed information about new features:
 - **[FEATURES.md](FEATURES.md)** - Complete guide to web interface, camera support, and stick inputs
 - **[INSTALL.md](INSTALL.md)** - Installation and setup instructions
 - **[CADDX_INFRA256_GUIDE.md](CADDX_INFRA256_GUIDE.md)** - Caddx Infra 256 (I2C) setup guide
+- **[VISUAL_COORDINATES_GUIDE.md](VISUAL_COORDINATES_GUIDE.md)** - Visual coordinates and barometer integration 📹
 - **[HIGH_ALTITUDE_GUIDE.md](HIGH_ALTITUDE_GUIDE.md)** - High altitude operation (30m+) guide ⬆️
 
 ## Project Files
@@ -448,6 +457,7 @@ For detailed information about new features:
 - `FEATURES.md` - **New!** Detailed guide for new features
 - `INSTALL.md` - Installation guide
 - `CADDX_INFRA256_GUIDE.md` - Caddx Infra 256 (I2C) setup guide
+- `VISUAL_COORDINATES_GUIDE.md` - **New!** Visual coordinates and barometer integration 📹
 - `HIGH_ALTITUDE_GUIDE.md` - **New!** High altitude operation (30m+) guide ⬆️
 
 ## Contributing

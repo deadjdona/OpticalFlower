@@ -113,7 +113,8 @@ class BetaflyStabilizerAdvanced:
             scale_factor=self.config['tracker']['scale_factor'],
             height_m=self.config['tracker']['initial_height'],
             max_altitude=self.config['tracker'].get('max_altitude', 50.0),
-            altitude_source=self.altitude_source
+            altitude_source=self.altitude_source,
+            use_visual_coords=self.config['tracker'].get('use_visual_coords', True)
         )
         
         # Initialize stabilization controller
@@ -196,7 +197,8 @@ class BetaflyStabilizerAdvanced:
             'tracker': {
                 'scale_factor': 0.001,
                 'initial_height': 0.5,
-                'max_altitude': 50.0
+                'max_altitude': 50.0,
+                'use_visual_coords': True
             },
             'altitude': {
                 'enabled': False,
@@ -322,6 +324,12 @@ class BetaflyStabilizerAdvanced:
         while self.running:
             loop_start = time.time()
             
+            # Update barometer velocity from altitude source if available
+            if self.altitude_source and hasattr(self.altitude_source, 'get_velocity'):
+                barometer_vel = self.altitude_source.get_velocity()
+                if barometer_vel is not None:
+                    self.tracker.set_barometer_velocity(barometer_vel)
+            
             # Update position tracking
             pos_x, pos_y = self.tracker.update()
             vel_x, vel_y = self.tracker.get_velocity()
@@ -372,6 +380,8 @@ class BetaflyStabilizerAdvanced:
                 system_state['height'] = self.tracker.height_m
                 system_state['tracking_confidence'] = self.tracker.get_tracking_confidence()
                 system_state['altitude_valid'] = self.tracker.is_altitude_valid()
+                system_state['barometer_velocity'] = self.tracker.get_barometer_velocity()
+                system_state['visual_coordinates'] = self.tracker.is_using_visual_coordinates()
                 system_state['stick_inputs'] = {
                     'pitch': stick_pitch,
                     'roll': stick_roll,

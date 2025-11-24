@@ -39,6 +39,13 @@ class AltitudeSource(ABC):
     def is_available(self) -> bool:
         """Check if altitude source is available and functioning"""
         pass
+    
+    def get_velocity(self) -> Optional[float]:
+        """
+        Get vertical velocity in m/s (positive = ascending)
+        Override in subclasses that support velocity
+        """
+        return None
 
 
 class StaticAltitudeSource(AltitudeSource):
@@ -92,6 +99,7 @@ class MAVLinkAltitudeSource(AltitudeSource):
         self.baudrate = baudrate
         self.mavlink_conn = None
         self.last_altitude = None
+        self.last_velocity = None  # Vertical velocity m/s
         self.last_update_time = 0
         self.timeout = 2.0  # Timeout in seconds
         
@@ -139,7 +147,11 @@ class MAVLinkAltitudeSource(AltitudeSource):
             if msg:
                 # relative_alt is in millimeters, convert to meters
                 altitude_m = msg.relative_alt / 1000.0
+                # vz is in cm/s, convert to m/s (negative = up in NED frame)
+                velocity_z = -msg.vz / 100.0  # Convert and invert for positive = up
+                
                 self.last_altitude = altitude_m
+                self.last_velocity = velocity_z
                 self.last_update_time = time.time()
                 return altitude_m
             
@@ -153,6 +165,19 @@ class MAVLinkAltitudeSource(AltitudeSource):
         except Exception as e:
             logger.error(f"Error reading MAVLink altitude: {e}")
             return self.last_altitude
+    
+    def get_velocity(self) -> Optional[float]:
+        """
+        Get vertical velocity from barometer (m/s, positive = ascending)
+        """
+        if not self.mavlink_conn:
+            return self.last_velocity
+        
+        # Velocity is updated in get_altitude() call
+        if time.time() - self.last_update_time < self.timeout:
+            return self.last_velocity
+        
+        return None
     
     def is_available(self) -> bool:
         """Check if MAVLink connection is active"""

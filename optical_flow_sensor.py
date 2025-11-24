@@ -162,10 +162,11 @@ class OpticalFlowTracker:
     """
     Higher-level optical flow tracking with position estimation
     Supports high altitude operation (30+ meters) with adaptive filtering
+    Uses visual coordinate system (camera frame of reference)
     """
     
     def __init__(self, sensor: PMW3901, scale_factor: float = 0.001, height_m: float = 0.5,
-                 max_altitude: float = 50.0, altitude_source=None):
+                 max_altitude: float = 50.0, altitude_source=None, use_visual_coords: bool = True):
         """
         Initialize optical flow tracker
         
@@ -175,12 +176,14 @@ class OpticalFlowTracker:
             height_m: Height above ground in meters (affects scale)
             max_altitude: Maximum supported altitude in meters
             altitude_source: Optional altitude source for dynamic height updates
+            use_visual_coords: Use visual coordinate system (camera frame) vs world frame
         """
         self.sensor = sensor
         self.scale_factor = scale_factor
         self.height_m = height_m
         self.max_altitude = max_altitude
         self.altitude_source = altitude_source
+        self.use_visual_coords = use_visual_coords
         
         # Position tracking
         self.pos_x = 0.0
@@ -207,6 +210,12 @@ class OpticalFlowTracker:
         # Tracking quality and confidence
         self.tracking_confidence = 1.0  # 0.0 to 1.0
         self.last_quality_check = time.time()
+        
+        # Barometer velocity (from flight controller)
+        self.barometer_velocity_z = 0.0  # m/s vertical velocity
+        self.use_barometer_velocity = False
+        
+        logger.info(f"OpticalFlowTracker initialized (visual_coords: {use_visual_coords})")
     
     def update(self) -> Tuple[float, float]:
         """
@@ -405,3 +414,21 @@ class OpticalFlowTracker:
     def is_altitude_valid(self) -> bool:
         """Check if current altitude is within valid tracking range"""
         return 0.1 <= self.height_m <= self.max_altitude
+    
+    def set_barometer_velocity(self, velocity_z: float):
+        """
+        Set vertical velocity from flight controller barometer
+        
+        Args:
+            velocity_z: Vertical velocity in m/s (positive = ascending)
+        """
+        self.barometer_velocity_z = velocity_z
+        self.use_barometer_velocity = True
+    
+    def get_barometer_velocity(self) -> float:
+        """Get vertical velocity from barometer (m/s)"""
+        return self.barometer_velocity_z
+    
+    def is_using_visual_coordinates(self) -> bool:
+        """Check if using visual coordinate system"""
+        return self.use_visual_coords
