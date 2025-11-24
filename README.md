@@ -2,6 +2,12 @@
 
 A complete optical flow-based position stabilization system for the Betafly drone, optimized for Raspberry Pi Zero.
 
+> **📌 NOTE**: This is the **universal `main` branch** supporting all flight controllers.  
+> For optimized versions, see:
+> - **[`betaflight` branch](../../tree/betaflight)** - Optimized for Betaflight/iNav (NMEA GPS)
+> - **[`ardupilot` branch](../../tree/ardupilot)** - Optimized for ArduPilot/PX4 (MAVLink GPS)
+> - **[Branch Comparison](BRANCH_INFO.md)** - Detailed comparison and selection guide
+
 ## ✨ New Features
 
 - **🌐 Web Interface**: Beautiful real-time dashboard for monitoring and configuration (port 8080)
