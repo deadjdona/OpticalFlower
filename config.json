@@ -6,12 +6,26 @@
     "i2c_bus": 1,
     "i2c_address": 41,
     "rotation": 0,
-    "comment": "type: pmw3901, caddx_infra256, usb_camera, csi_camera, analog_usb, opencv_any. i2c_address: 41 (0x29 default for Caddx)"
+    "comment": "type: pmw3901, caddx_infra256, usb_camera, csi_camera, analog_usb, opencv_any. i2c_address: 41 (0x29 default for Caddx Infra 256). Note: Caddx Infra 256CA uses analog video (CVBS), use analog_usb type"
   },
   "tracker": {
     "scale_factor": 0.001,
     "initial_height": 0.5,
-    "comment": "scale_factor converts sensor units to meters, height is in meters"
+    "max_altitude": 50.0,
+    "use_visual_coords": true,
+    "comment": "scale_factor converts sensor units to meters, height is in meters, max_altitude is maximum supported altitude. use_visual_coords=true uses camera frame (recommended for position hold)"
+  },
+  "altitude": {
+    "enabled": false,
+    "type": "static",
+    "fixed_altitude": 0.5,
+    "connection": "/dev/ttyAMA0",
+    "baudrate": 115200,
+    "port": "/dev/ttyUSB0",
+    "protocol": "benewake",
+    "sensor": "bmp280",
+    "i2c_bus": 1,
+    "comment": "Altitude source for high altitude operation. type: static, mavlink, rangefinder, barometer, fused. For position hold, enable mavlink to read barometer velocity from flight controller"
   },
   "pid": {
     "position_x": {
@@ -30,7 +44,9 @@
   "stabilizer": {
     "velocity_damping": 0.3,
     "max_tilt_angle": 15.0,
-    "comment": "velocity_damping: 0-1, max_tilt_angle in degrees"
+    "altitude_adaptive": true,
+    "high_altitude_damping_boost": 0.5,
+    "comment": "velocity_damping: 0-1, max_tilt_angle in degrees. altitude_adaptive increases damping at high altitude (30m+) for stability"
   },
   "control": {
     "update_rate_hz": 50,
@@ -70,5 +86,16 @@
     "host": "0.0.0.0",
     "port": 8080,
     "comment": "Web GUI for configuration and monitoring"
+  },
+  "gps_emulation": {
+    "enabled": false,
+    "protocol": "nmea",
+    "port": "/dev/ttyAMA0",
+    "baudrate": 115200,
+    "update_rate_hz": 5,
+    "home_lat": 0.0,
+    "home_lon": 0.0,
+    "home_alt": 0.0,
+    "comment": "GPS emulation: Pi appears as GPS module to flight controller. protocol: nmea (most FCs) or mavlink. Set home position at takeoff. FC does position hold using this 'GPS' data"
   }
 }

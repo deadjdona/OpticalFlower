@@ -2,6 +2,12 @@
 
 A complete optical flow-based position stabilization system for the Betafly drone, optimized for Raspberry Pi Zero.
 
+> **📌 NOTE**: This is the **universal `main` branch** supporting all flight controllers.  
+> For optimized versions, see:
+> - **[`betaflight` branch](../../tree/betaflight)** - Optimized for Betaflight/iNav (NMEA GPS)
+> - **[`ardupilot` branch](../../tree/ardupilot)** - Optimized for ArduPilot/PX4 (MAVLink GPS)
+> - **[Branch Comparison](BRANCH_INFO.md)** - Detailed comparison and selection guide
+
 ## ✨ New Features
 
 - **🌐 Web Interface**: Beautiful real-time dashboard for monitoring and configuration (port 8080)
@@ -14,6 +20,11 @@ A complete optical flow-based position stabilization system for the Betafly dron
 
 - **Optical Flow Sensing**: Multiple sensor options for precise motion tracking
 - **Position Hold**: Maintains GPS-free position hold using visual odometry
+- **GPS Emulation**: Pi acts as GPS module for flight controller via UART 📡
+- **Visual Coordinate System**: Camera-frame position hold (no compass required) 📹
+- **Barometer Integration**: Reads vertical velocity from flight controller for improved accuracy
+- **High Altitude Support**: Works reliably at 30m+ altitude with adaptive algorithms ⬆️
+- **Altitude-Adaptive Control**: Automatically adjusts filtering and gains based on altitude
 - **Velocity Damping**: Reduces drift and oscillations during flight
 - **PID Control**: Tunable PID controllers for X and Y axis stabilization
 - **Multiple Modes**: Off, velocity damping, and position hold modes
@@ -27,6 +38,7 @@ A complete optical flow-based position stabilization system for the Betafly dron
 - **Optical Flow Sensor** (choose one):
   - PMW3901 Optical Flow Sensor (SPI) - Pimoroni or similar
   - **Caddx Infra 256 (I2C)** - Recommended for production ⭐
+  - Caddx Infra 256CA (Analog CVBS) - Use with USB capture card
   - USB/CSI/Analog Camera (for computer vision approach)
 - **Flight Controller** (Betaflight, iNav, or ArduPilot compatible)
 - **Power Supply** (5V for Pi, shared with drone battery via BEC)
@@ -60,6 +72,24 @@ SCL             -> Pin 5 (GPIO 3 / I2C SCL)
 - ✅ Infrared technology (better in varied lighting)
 - ✅ Lower power consumption
 - ✅ I2C interface (easier debugging)
+
+#### Option 3: Caddx Infra 256CA (Analog Camera)
+```
+Caddx Infra 256CA -> USB Capture Card -> Raspberry Pi
+--------------------------------------------------------
+5V              -> USB Capture Card 5V
+GND             -> USB Capture Card GND
+CVBS (Video)    -> USB Capture Card Video In
+USB Capture Card -> Pi USB Port
+```
+
+**Note**: Caddx Infra 256CA outputs analog video (CVBS), not I2C. It requires a USB video capture card for optical flow processing. Configure as `"type": "analog_usb"` in config.json.
+
+**Benefits:**
+- ✅ Infrared technology (works in low light)
+- ✅ Standard analog video output
+- ✅ Can also record FPV footage
+- ✅ Simple 3-wire connection (5V, GND, CVBS)
 
 **Important**: Ensure the sensor is mounted facing downward with adequate lighting for optical tracking.
 
@@ -114,10 +144,26 @@ Edit `config.json` to customize the system for your setup:
 ```json
 {
   "sensor": {
+    "type": "pmw3901",  // Options: pmw3901, caddx_infra256, analog_usb (for Caddx 256CA)
     "rotation": 0,  // Adjust based on sensor mounting orientation
   },
   "tracker": {
     "initial_height": 0.5,  // Expected flight height in meters
+    "use_visual_coords": true,  // Use visual coordinate system (recommended)
+  },
+  "altitude": {
+    "enabled": true,  // Enable for barometer velocity from flight controller
+    "type": "mavlink",  // Read from flight controller via MAVLink
+    "connection": "/dev/ttyAMA0"
+  },
+  "gps_emulation": {
+    "enabled": false,  // Enable to make Pi act as GPS module for FC
+    "protocol": "nmea",  // Options: nmea (most FCs), mavlink
+    "port": "/dev/ttyAMA0",  // UART port to FC GPS input
+    "baudrate": 115200,  // Must match FC GPS baudrate
+    "home_lat": 0.0,  // Set to your takeoff location
+    "home_lon": 0.0,
+    "home_alt": 0.0
   },
   "pid": {
     "position_x": {
@@ -154,6 +200,34 @@ The web interface provides:
 - Configuration editor
 - Mode switching controls
 - Stick input monitoring
+
+### GPS Emulation Mode 📡
+
+Enable GPS emulation to make the Raspberry Pi act as a GPS module:
+
+```bash
+# Edit config.json
+nano config.json
+
+# Set:
+# "gps_emulation": {
+#   "enabled": true,
+#   "protocol": "nmea",
+#   "port": "/dev/ttyAMA0",
+#   "baudrate": 115200
+# }
+
+# Then start the system
+./betafly_stabilizer_advanced.py
+```
+
+**With GPS emulation enabled:**
+- Pi sends optical flow position as GPS data via UART
+- Flight controller thinks it has GPS connected
+- FC does position hold using standard GPS modes
+- No need for Pi to send pitch/roll corrections
+
+See **[GPS_EMULATION_GUIDE.md](GPS_EMULATION_GUIDE.md)** for complete setup instructions
 
 ### Basic Command Line Usage
 
@@ -392,17 +466,27 @@ controller.hold_current_position(x, y)  # Hold at position
 For detailed information about new features:
 - **[FEATURES.md](FEATURES.md)** - Complete guide to web interface, camera support, and stick inputs
 - **[INSTALL.md](INSTALL.md)** - Installation and setup instructions
+- **[GPS_EMULATION_GUIDE.md](GPS_EMULATION_GUIDE.md)** - GPS emulation for flight controller integration 📡
+- **[CADDX_INFRA256_GUIDE.md](CADDX_INFRA256_GUIDE.md)** - Caddx Infra 256 (I2C) setup guide
+- **[VISUAL_COORDINATES_GUIDE.md](VISUAL_COORDINATES_GUIDE.md)** - Visual coordinates and barometer integration 📹
+- **[HIGH_ALTITUDE_GUIDE.md](HIGH_ALTITUDE_GUIDE.md)** - High altitude operation (30m+) guide ⬆️
 
 ## Project Files
 
 ### Core System
 - `betafly_stabilizer.py` - Original basic control script
 - `betafly_stabilizer_advanced.py` - **New!** Advanced system with all features
-- `optical_flow_sensor.py` - PMW3901 sensor interface
-- `camera_optical_flow.py` - **New!** Camera-based optical flow (USB/CSI/Analog)
-- `position_stabilizer.py` - PID control and stabilization algorithms
+- `optical_flow_sensor.py` - PMW3901 sensor interface (with altitude-adaptive tracking)
+- `caddx_infra256.py` - Caddx Infra 256 driver (I2C)
+- `camera_optical_flow.py` - **New!** Camera-based optical flow (USB/CSI/Analog, includes Caddx 256CA)
+- `altitude_source.py` - **New!** Multi-source altitude management (MAVLink, rangefinder, barometer) ⬆️
+- `gps_emulation.py` - **New!** GPS emulation for flight controller (NMEA/MAVLink) 📡
+- `position_stabilizer.py` - PID control with altitude-adaptive algorithms
 - `stick_input.py` - **New!** RC receiver input handling (SBUS/PWM)
 - `web_interface.py` - **New!** Flask web server and API
+
+### Hardware Guides
+- `WIRING_GUIDE.md` - **New!** Complete wiring diagrams for all configurations 🔌
 
 ### Web Interface
 - `templates/index.html` - Web dashboard UI
@@ -410,7 +494,7 @@ For detailed information about new features:
 - `static/js/app.js` - Frontend JavaScript
 
 ### Configuration & Setup
-- `config.json` - **Updated!** Configuration file with camera and stick input options
+- `config.json` - **Updated!** Configuration file with all options (100m altitude support)
 - `setup.sh` - Automated setup script
 - `requirements.txt` - **Updated!** Python dependencies (includes OpenCV, Flask)
 
@@ -421,6 +505,9 @@ For detailed information about new features:
 - `README.md` - This file
 - `FEATURES.md` - **New!** Detailed guide for new features
 - `INSTALL.md` - Installation guide
+- `CADDX_INFRA256_GUIDE.md` - Caddx Infra 256 (I2C) setup guide
+- `VISUAL_COORDINATES_GUIDE.md` - **New!** Visual coordinates and barometer integration 📹
+- `HIGH_ALTITUDE_GUIDE.md` - **New!** High altitude operation (30m+) guide ⬆️
 
 ## Contributing
 
@@ -432,6 +519,8 @@ Contributions welcome! Areas for improvement:
 - Ground effect compensation
 - Additional web interface features
 - Mobile app development
+- Advanced computer vision algorithms
+- Multi-sensor fusion improvements
 
 ## License
 
@@ -456,9 +545,24 @@ For issues, questions, or contributions:
 
 Developed for the Betafly drone project using:
 - PMW3901 optical flow sensor
+- Caddx Infra 256 (I2C) optical flow sensor
+- Caddx Infra 256CA (analog camera) with computer vision
 - Raspberry Pi Zero platform
 - PID control theory
 - Visual odometry principles
+
+## Sensor Comparison Quick Reference
+
+| Feature | PMW3901 | Caddx Infra 256 | Caddx Infra 256CA |
+|---------|---------|----------------|-------------------|
+| Interface | SPI | I2C | Analog CVBS |
+| Wiring | 6 wires | 4 wires | 3 wires + USB capture |
+| Direct Connection | Yes | Yes | No (needs capture card) |
+| Power | ~20mA | ~15mA | ~100mA |
+| Lighting | Visible | Infrared | Infrared |
+| Video Output | No | No | Yes (analog) |
+| Best For | Prototyping | Production I2C | Analog FPV + Optical Flow |
+| Price | $ | $$ | $$ |
 
 ---
 

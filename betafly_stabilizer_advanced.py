@@ -18,6 +18,8 @@ from camera_optical_flow import CameraOpticalFlow, AnalogCameraFlow, auto_detect
 from position_stabilizer import StabilizationController, PIDGains
 from stick_input import StickInput, StickMixer, ModeSwitch
 from web_interface import app, system_state, state_lock, start_web_server
+from altitude_source import create_altitude_source, AltitudeSource
+from gps_emulation import create_gps_emulator, GPSEmulator
 
 # Try to import Caddx Infra 256
 try:
@@ -96,11 +98,35 @@ class BetaflyStabilizerAdvanced:
         else:
             raise ValueError(f"Unknown camera type: {camera_type}")
         
+        # Initialize altitude source if enabled
+        self.altitude_source = None
+        if self.config.get('altitude', {}).get('enabled', False):
+            try:
+                self.altitude_source = create_altitude_source(self.config['altitude'])
+                logger.info(f"Altitude source initialized: {type(self.altitude_source).__name__}")
+            except Exception as e:
+                logger.error(f"Failed to initialize altitude source: {e}")
+                self.altitude_source = None
+        
+        # Initialize GPS emulator if enabled
+        self.gps_emulator = None
+        if self.config.get('gps_emulation', {}).get('enabled', False):
+            try:
+                self.gps_emulator = create_gps_emulator(self.config['gps_emulation'])
+                if self.gps_emulator:
+                    logger.info(f"GPS emulator initialized: {type(self.gps_emulator).__name__}")
+            except Exception as e:
+                logger.error(f"Failed to initialize GPS emulator: {e}")
+                self.gps_emulator = None
+        
         # Initialize optical flow tracker
         self.tracker = OpticalFlowTracker(
             sensor=self.sensor,
             scale_factor=self.config['tracker']['scale_factor'],
-            height_m=self.config['tracker']['initial_height']
+            height_m=self.config['tracker']['initial_height'],
+            max_altitude=self.config['tracker'].get('max_altitude', 50.0),
+            altitude_source=self.altitude_source,
+            use_visual_coords=self.config['tracker'].get('use_visual_coords', True)
         )
         
         # Initialize stabilization controller
@@ -111,7 +137,9 @@ class BetaflyStabilizerAdvanced:
             position_gains_x=position_gains_x,
             position_gains_y=position_gains_y,
             velocity_damping=self.config['stabilizer']['velocity_damping'],
-            max_tilt=self.config['stabilizer']['max_tilt_angle']
+            max_tilt=self.config['stabilizer']['max_tilt_angle'],
+            altitude_adaptive=self.config['stabilizer'].get('altitude_adaptive', True),
+            high_altitude_damping_boost=self.config['stabilizer'].get('high_altitude_damping_boost', 0.5)
         )
         
         # Initialize stick input if enabled
@@ -180,7 +208,14 @@ class BetaflyStabilizerAdvanced:
             },
             'tracker': {
                 'scale_factor': 0.001,
-                'initial_height': 0.5
+                'initial_height': 0.5,
+                'max_altitude': 50.0,
+                'use_visual_coords': True
+            },
+            'altitude': {
+                'enabled': False,
+                'type': 'static',
+                'fixed_altitude': 0.5
             },
             'pid': {
                 'position_x': {'kp': 0.5, 'ki': 0.1, 'kd': 0.2},
@@ -188,7 +223,9 @@ class BetaflyStabilizerAdvanced:
             },
             'stabilizer': {
                 'velocity_damping': 0.3,
-                'max_tilt_angle': 15.0
+                'max_tilt_angle': 15.0,
+                'altitude_adaptive': True,
+                'high_altitude_damping_boost': 0.5
             },
             'control': {
                 'update_rate_hz': 50
@@ -217,6 +254,15 @@ class BetaflyStabilizerAdvanced:
                 'enabled': True,
                 'host': '0.0.0.0',
                 'port': 8080
+            },
+            'gps_emulation': {
+                'enabled': False,
+                'protocol': 'nmea',
+                'port': '/dev/ttyAMA0',
+                'baudrate': 115200,
+                'home_lat': 0.0,
+                'home_lon': 0.0,
+                'home_alt': 0.0
             }
         }
         
@@ -283,6 +329,10 @@ class BetaflyStabilizerAdvanced:
         if self.stick_input:
             self.stick_input.stop()
         
+        # Close GPS emulator
+        if self.gps_emulator:
+            self.gps_emulator.close()
+        
         # Close log file
         if self.log_file:
             self.log_file.close()
@@ -299,6 +349,12 @@ class BetaflyStabilizerAdvanced:
         while self.running:
             loop_start = time.time()
             
+            # Update barometer velocity from altitude source if available
+            if self.altitude_source and hasattr(self.altitude_source, 'get_velocity'):
+                barometer_vel = self.altitude_source.get_velocity()
+                if barometer_vel is not None:
+                    self.tracker.set_barometer_velocity(barometer_vel)
+            
             # Update position tracking
             pos_x, pos_y = self.tracker.update()
             vel_x, vel_y = self.tracker.get_velocity()
@@ -310,9 +366,10 @@ class BetaflyStabilizerAdvanced:
                     self.stabilizer.set_mode(rc_mode)
                     logger.info(f"Mode switched via RC to: {rc_mode}")
             
-            # Update stabilization controller
+            # Update stabilization controller with current altitude
+            current_altitude = self.tracker.get_altitude()
             pitch_correction, roll_correction = self.stabilizer.update(
-                pos_x, pos_y, vel_x, vel_y
+                pos_x, pos_y, vel_x, vel_y, altitude_m=current_altitude
             )
             
             # Mix with manual stick inputs if enabled
@@ -346,6 +403,10 @@ class BetaflyStabilizerAdvanced:
                 system_state['corrections'] = {'pitch': pitch_correction, 'roll': roll_correction}
                 system_state['surface_quality'] = surface_quality
                 system_state['height'] = self.tracker.height_m
+                system_state['tracking_confidence'] = self.tracker.get_tracking_confidence()
+                system_state['altitude_valid'] = self.tracker.is_altitude_valid()
+                system_state['barometer_velocity'] = self.tracker.get_barometer_velocity()
+                system_state['visual_coordinates'] = self.tracker.is_using_visual_coordinates()
                 system_state['stick_inputs'] = {
                     'pitch': stick_pitch,
                     'roll': stick_roll,
@@ -355,8 +416,21 @@ class BetaflyStabilizerAdvanced:
                 system_state['camera_type'] = self.camera_type
                 system_state['last_update'] = time.time()
             
-            # Send corrections to flight controller
-            self._send_corrections(pitch_correction, roll_correction)
+            # Send GPS emulation data to flight controller if enabled
+            if self.gps_emulator:
+                try:
+                    self.gps_emulator.send_position(
+                        pos_x, pos_y, 
+                        self.tracker.get_altitude(),
+                        vel_x, vel_y
+                    )
+                except Exception as e:
+                    if loop_count % 100 == 0:  # Log errors occasionally
+                        logger.error(f"GPS emulation error: {e}")
+            
+            # Send corrections to flight controller (if not using GPS emulation)
+            if not self.gps_emulator:
+                self._send_corrections(pitch_correction, roll_correction)
             
             # Log data
             if self.log_data and loop_count % 10 == 0:
@@ -374,10 +448,14 @@ class BetaflyStabilizerAdvanced:
                 if self.stick_input:
                     stick_str = f" | Sticks: P:{stick_pitch} R:{stick_roll} T:{stick_throttle}"
                 
+                # Add altitude and confidence info
+                altitude_str = f" | Alt: {self.tracker.get_altitude():.1f}m"
+                confidence_str = f" | Conf: {self.tracker.get_tracking_confidence():.2f}"
+                
                 logger.info(
                     f"Pos: ({pos_x:.3f}, {pos_y:.3f})m | "
                     f"Vel: ({vel_x:.3f}, {vel_y:.3f})m/s | "
-                    f"Cmd: P:{pitch_correction:.2f}° R:{roll_correction:.2f}°{stick_str} | "
+                    f"Cmd: P:{pitch_correction:.2f}° R:{roll_correction:.2f}°{stick_str}{altitude_str}{confidence_str} | "
                     f"Quality: {surface_quality} | Mode: {self.stabilizer.mode}"
                 )
             
