@@ -28,16 +28,6 @@ except ImportError:
     CADDX_AVAILABLE = False
     logger.warning("Caddx Infra 256 support not available")
 
-# Try to import Caddx Infra 256CA with AI Box
-try:
-    from caddx_infra256_aibox import (
-        CaddxInfra256AIBox, AIBoxConfig, AIBoxMode, TrackingTarget
-    )
-    CADDX_AIBOX_AVAILABLE = True
-except ImportError:
-    CADDX_AIBOX_AVAILABLE = False
-    logger.warning("Caddx Infra 256CA AI Box support not available")
-
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -80,54 +70,6 @@ class BetaflyStabilizerAdvanced:
                 bus_number=self.config['sensor'].get('i2c_bus', 1),
                 address=self.config['sensor'].get('i2c_address', 0x29),
                 rotation=self.config['sensor']['rotation']
-            )
-        elif camera_type == 'caddx_infra256_aibox':
-            if not CADDX_AIBOX_AVAILABLE:
-                raise RuntimeError("Caddx Infra 256CA AI Box support not available. Install smbus2: pip install smbus2")
-            
-            # Build AI Box configuration
-            ai_box_cfg = self.config.get('ai_box', {})
-            
-            # Map string mode names to enum
-            mode_map = {
-                'optical_flow_only': AIBoxMode.OPTICAL_FLOW_ONLY,
-                'tracking_assist': AIBoxMode.TRACKING_ASSIST,
-                'object_detection': AIBoxMode.OBJECT_DETECTION,
-                'stabilization_enhanced': AIBoxMode.STABILIZATION_ENHANCED,
-                'auto_mode': AIBoxMode.AUTO_MODE
-            }
-            
-            target_map = {
-                'none': TrackingTarget.NONE,
-                'person': TrackingTarget.PERSON,
-                'vehicle': TrackingTarget.VEHICLE,
-                'custom_object': TrackingTarget.CUSTOM_OBJECT,
-                'landing_pad': TrackingTarget.LANDING_PAD,
-                'ground_texture': TrackingTarget.GROUND_TEXTURE
-            }
-            
-            ai_mode = mode_map.get(ai_box_cfg.get('mode', 'auto_mode'), AIBoxMode.AUTO_MODE)
-            ai_target = target_map.get(ai_box_cfg.get('tracking_target', 'ground_texture'), TrackingTarget.GROUND_TEXTURE)
-            
-            ai_config = AIBoxConfig(
-                mode=ai_mode,
-                tracking_target=ai_target,
-                roi_enabled=ai_box_cfg.get('roi_enabled', True),
-                roi_x=ai_box_cfg.get('roi_x', 160),
-                roi_y=ai_box_cfg.get('roi_y', 160),
-                roi_width=ai_box_cfg.get('roi_width', 160),
-                roi_height=ai_box_cfg.get('roi_height', 160),
-                detection_threshold=ai_box_cfg.get('detection_threshold', 0.6),
-                stabilization_strength=ai_box_cfg.get('stabilization_strength', 0.5),
-                update_rate_hz=ai_box_cfg.get('update_rate_hz', 50)
-            )
-            
-            self.sensor = CaddxInfra256AIBox(
-                bus_number=self.config['sensor'].get('i2c_bus', 1),
-                i2c_address=self.config['sensor'].get('i2c_address', 0x29),
-                uart_port=self.config['sensor'].get('uart_port', None),
-                rotation=self.config['sensor']['rotation'],
-                ai_config=ai_config if ai_box_cfg.get('enabled', False) else None
             )
         elif camera_type in ['usb_camera', 'csi_camera', 'opencv_any']:
             camera_id = self.config.get('camera', {}).get('device', 0)
@@ -419,20 +361,6 @@ class BetaflyStabilizerAdvanced:
             # Get surface quality for monitoring
             surface_quality = self.tracker.get_surface_quality()
             
-            # Get AI Box status if available
-            ai_status_dict = {}
-            if self.camera_type == 'caddx_infra256_aibox' and hasattr(self.sensor, 'get_ai_status'):
-                ai_status = self.sensor.get_ai_status()
-                if ai_status:
-                    ai_status_dict = {
-                        'mode': ai_status.mode.name,
-                        'tracking_active': ai_status.tracking_active,
-                        'target_detected': ai_status.target_detected,
-                        'target_type': ai_status.target_type.name,
-                        'confidence': ai_status.target_confidence,
-                        'fps': ai_status.processing_fps
-                    }
-            
             # Update web interface state
             with state_lock:
                 system_state['running'] = True
@@ -451,7 +379,6 @@ class BetaflyStabilizerAdvanced:
                     'yaw': stick_yaw
                 }
                 system_state['camera_type'] = self.camera_type
-                system_state['ai_box_status'] = ai_status_dict
                 system_state['last_update'] = time.time()
             
             # Send corrections to flight controller
@@ -473,10 +400,6 @@ class BetaflyStabilizerAdvanced:
                 if self.stick_input:
                     stick_str = f" | Sticks: P:{stick_pitch} R:{stick_roll} T:{stick_throttle}"
                 
-                ai_str = ""
-                if ai_status_dict:
-                    ai_str = f" | AI: {ai_status_dict.get('target_type', 'N/A')} ({ai_status_dict.get('confidence', 0):.2f})"
-                
                 # Add altitude and confidence info
                 altitude_str = f" | Alt: {self.tracker.get_altitude():.1f}m"
                 confidence_str = f" | Conf: {self.tracker.get_tracking_confidence():.2f}"
@@ -484,7 +407,7 @@ class BetaflyStabilizerAdvanced:
                 logger.info(
                     f"Pos: ({pos_x:.3f}, {pos_y:.3f})m | "
                     f"Vel: ({vel_x:.3f}, {vel_y:.3f})m/s | "
-                    f"Cmd: P:{pitch_correction:.2f}° R:{roll_correction:.2f}°{stick_str}{ai_str}{altitude_str}{confidence_str} | "
+                    f"Cmd: P:{pitch_correction:.2f}° R:{roll_correction:.2f}°{stick_str}{altitude_str}{confidence_str} | "
                     f"Quality: {surface_quality} | Mode: {self.stabilizer.mode}"
                 )
             

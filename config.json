@@ -5,9 +5,8 @@
     "spi_device": 0,
     "i2c_bus": 1,
     "i2c_address": 41,
-    "uart_port": null,
     "rotation": 0,
-    "comment": "type: pmw3901, caddx_infra256, caddx_infra256_aibox, usb_camera, csi_camera, analog_usb, opencv_any. i2c_address: 41 (0x29 default for Caddx)"
+    "comment": "type: pmw3901, caddx_infra256, usb_camera, csi_camera, analog_usb, opencv_any. i2c_address: 41 (0x29 default for Caddx Infra 256). Note: Caddx Infra 256CA uses analog video (CVBS), use analog_usb type"
   },
   "tracker": {
     "scale_factor": 0.001,
@@ -86,19 +85,5 @@
     "host": "0.0.0.0",
     "port": 8080,
     "comment": "Web GUI for configuration and monitoring"
-  },
-  "ai_box": {
-    "enabled": false,
-    "mode": "auto_mode",
-    "tracking_target": "ground_texture",
-    "roi_enabled": true,
-    "roi_x": 160,
-    "roi_y": 160,
-    "roi_width": 160,
-    "roi_height": 160,
-    "detection_threshold": 0.6,
-    "stabilization_strength": 0.5,
-    "update_rate_hz": 50,
-    "comment": "AI Box configuration for Caddx Infra 256CA. mode: optical_flow_only, tracking_assist, object_detection, stabilization_enhanced, auto_mode. tracking_target: none, person, vehicle, custom_object, landing_pad, ground_texture"
   }
 }

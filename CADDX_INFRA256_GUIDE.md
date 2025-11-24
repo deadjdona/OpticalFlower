@@ -4,6 +4,8 @@
 
 The Caddx Infra 256 is an infrared optical flow sensor designed specifically for drones. It provides GPS-free position tracking using I2C communication.
 
+**Note**: This guide covers the **Caddx Infra 256** (I2C version). For the **Caddx Infra 256CA** (analog camera version), see the Analog Camera section below.
+
 ### Advantages over PMW3901
 - **Infrared Technology**: Better performance in various lighting conditions
 - **I2C Communication**: Simpler wiring (only 2 data lines)
@@ -372,6 +374,78 @@ sensor.set_power_mode(low_power=True)  # Reduce power consumption
 }
 ```
 
+## Caddx Infra 256CA (Analog Version)
+
+### Important Differences
+
+The **Caddx Infra 256CA** is a different product that outputs **analog video (CVBS)**, not I2C data:
+
+**Caddx Infra 256CA Specifications:**
+- **Interface**: Analog video (CVBS)
+- **Pins**: 5V, GND, CVBS (3 pins only)
+- **Resolution**: Infrared analog camera
+- **Use Case**: FPV camera + optical flow via computer vision
+
+### Setup for Caddx 256CA
+
+#### Hardware:
+```
+Caddx Infra 256CA -> USB Video Capture Card -> Raspberry Pi
+--------------------------------------------------------------
+5V    -> Capture Card 5V (or external 5V)
+GND   -> Capture Card GND
+CVBS  -> Capture Card Video Input
+```
+
+#### Configuration:
+```json
+{
+  "sensor": {
+    "type": "analog_usb",
+    "rotation": 0
+  },
+  "camera": {
+    "device": "/dev/video0",
+    "width": 720,
+    "height": 480,
+    "fps": 30,
+    "method": "farneback",
+    "deinterlace": true
+  }
+}
+```
+
+#### Required Hardware:
+- **USB Video Capture Card**: EasyCAP or similar (720x480 NTSC or 720x576 PAL)
+- **Caddx Infra 256CA**: Analog infrared camera
+- **Power**: 5V regulated supply (100mA typical)
+
+#### Advantages of 256CA:
+- ✅ Dual purpose: FPV video + optical flow
+- ✅ Record flight footage
+- ✅ Standard analog video (works with any capture card)
+- ✅ Infrared low-light capability
+
+#### Disadvantages:
+- ❌ Requires USB capture card (not direct connection)
+- ❌ Higher processing overhead (computer vision vs direct sensor)
+- ❌ More power consumption (~100mA vs ~15mA for I2C version)
+- ❌ Lower update rate (30 fps vs 100 Hz for I2C version)
+
+### When to Use Each Version
+
+**Use Caddx Infra 256 (I2C)** when:
+- You want direct, low-latency optical flow data
+- Lowest power consumption is important
+- Don't need video recording
+- Want highest update rate (100 Hz)
+
+**Use Caddx Infra 256CA (Analog)** when:
+- You want FPV video + optical flow
+- Need to record flight footage
+- Already have analog video system
+- Don't mind higher power/processing overhead
+
 ## Support & Resources
 
 ### Official Resources
@@ -386,10 +460,18 @@ sensor.set_power_mode(low_power=True)  # Reduce power consumption
 
 ### Additional Help
 For Betafly-specific issues:
+
+**For Caddx Infra 256 (I2C)**:
 1. Check system logs: `sudo journalctl -u betafly-stabilizer.service -f`
 2. Run sensor test: `python3 caddx_infra256.py`
 3. Enable verbose logging: `./betafly_stabilizer_advanced.py -v`
 4. Check web interface diagnostics at http://raspberrypi.local:8080
+
+**For Caddx Infra 256CA (Analog)**:
+1. Test camera: `ls /dev/video*` (should show video device)
+2. View video feed: `ffplay /dev/video0`
+3. Check OpenCV: `python3 -c "import cv2; print(cv2.__version__)"`
+4. Use analog_usb sensor type in config
 
 ---
 
