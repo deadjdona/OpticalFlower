@@ -27,6 +27,7 @@ A complete optical flow-based position stabilization system for the Betafly dron
 - **Optical Flow Sensor** (choose one):
   - PMW3901 Optical Flow Sensor (SPI) - Pimoroni or similar
   - **Caddx Infra 256 (I2C)** - Recommended for production ⭐
+  - **Caddx Infra 256CA with AI Box (I2C)** - Best performance with AI 🤖⭐⭐
   - USB/CSI/Analog Camera (for computer vision approach)
 - **Flight Controller** (Betaflight, iNav, or ArduPilot compatible)
 - **Power Supply** (5V for Pi, shared with drone battery via BEC)
@@ -60,6 +61,28 @@ SCL             -> Pin 5 (GPIO 3 / I2C SCL)
 - ✅ Infrared technology (better in varied lighting)
 - ✅ Lower power consumption
 - ✅ I2C interface (easier debugging)
+
+#### Option 3: Caddx Infra 256CA with AI Box (I2C) 🤖⭐⭐ Best Performance
+```
+Caddx Infra 256CA AI Box -> Raspberry Pi Zero
+------------------------------------------------
+VCC (3.3V)      -> Pin 1  (3.3V)
+GND             -> Pin 6  (GND)
+SDA (I2C)       -> Pin 3  (GPIO 2 / I2C SDA)
+SCL (I2C)       -> Pin 5  (GPIO 3 / I2C SCL)
+TX (Optional)   -> Pin 10 (GPIO 15 / UART RX)  [Advanced AI features]
+RX (Optional)   -> Pin 8  (GPIO 14 / UART TX)  [Advanced AI features]
+```
+
+**AI Box Exclusive Features:**
+- 🤖 **AI-Enhanced Tracking**: Intelligent motion prediction and noise reduction
+- 🎯 **Object Detection**: Track persons, vehicles, landing pads, and more
+- 🔍 **Region of Interest**: Focus processing on specific areas
+- ⚡ **Smart Modes**: Auto-adaptive modes for different flight scenarios
+- 📊 **Confidence Metrics**: Real-time tracking quality feedback
+- 🎨 **Multiple Targets**: Ground texture, landing pad, person, vehicle tracking
+
+**See [CADDX_INFRA256CA_AIBOX_GUIDE.md](CADDX_INFRA256CA_AIBOX_GUIDE.md) for detailed setup**
 
 **Important**: Ensure the sensor is mounted facing downward with adequate lighting for optical tracking.
 
@@ -114,6 +137,7 @@ Edit `config.json` to customize the system for your setup:
 ```json
 {
   "sensor": {
+    "type": "pmw3901",  // Options: pmw3901, caddx_infra256, caddx_infra256_aibox
     "rotation": 0,  // Adjust based on sensor mounting orientation
   },
   "tracker": {
@@ -392,6 +416,8 @@ controller.hold_current_position(x, y)  # Hold at position
 For detailed information about new features:
 - **[FEATURES.md](FEATURES.md)** - Complete guide to web interface, camera support, and stick inputs
 - **[INSTALL.md](INSTALL.md)** - Installation and setup instructions
+- **[CADDX_INFRA256_GUIDE.md](CADDX_INFRA256_GUIDE.md)** - Caddx Infra 256 standard version setup
+- **[CADDX_INFRA256CA_AIBOX_GUIDE.md](CADDX_INFRA256CA_AIBOX_GUIDE.md)** - AI Box setup and configuration 🤖
 
 ## Project Files
 
@@ -399,6 +425,8 @@ For detailed information about new features:
 - `betafly_stabilizer.py` - Original basic control script
 - `betafly_stabilizer_advanced.py` - **New!** Advanced system with all features
 - `optical_flow_sensor.py` - PMW3901 sensor interface
+- `caddx_infra256.py` - Caddx Infra 256 standard driver (I2C)
+- `caddx_infra256_aibox.py` - **New!** Caddx Infra 256CA with AI Box driver 🤖
 - `camera_optical_flow.py` - **New!** Camera-based optical flow (USB/CSI/Analog)
 - `position_stabilizer.py` - PID control and stabilization algorithms
 - `stick_input.py` - **New!** RC receiver input handling (SBUS/PWM)
@@ -421,6 +449,8 @@ For detailed information about new features:
 - `README.md` - This file
 - `FEATURES.md` - **New!** Detailed guide for new features
 - `INSTALL.md` - Installation guide
+- `CADDX_INFRA256_GUIDE.md` - Caddx Infra 256 standard setup
+- `CADDX_INFRA256CA_AIBOX_GUIDE.md` - **New!** AI Box setup and features 🤖
 
 ## Contributing
 
@@ -432,6 +462,8 @@ Contributions welcome! Areas for improvement:
 - Ground effect compensation
 - Additional web interface features
 - Mobile app development
+- Custom AI model training for AI Box
+- Advanced object tracking algorithms
 
 ## License
 
@@ -456,10 +488,25 @@ For issues, questions, or contributions:
 
 Developed for the Betafly drone project using:
 - PMW3901 optical flow sensor
+- Caddx Infra 256 / 256CA optical flow sensors
+- AI-powered tracking and object detection
 - Raspberry Pi Zero platform
 - PID control theory
 - Visual odometry principles
 
+## Sensor Comparison Quick Reference
+
+| Feature | PMW3901 | Caddx Infra 256 | Caddx 256CA AI Box |
+|---------|---------|----------------|-------------------|
+| Interface | SPI | I2C | I2C + UART |
+| Wiring | 6 wires | 4 wires | 4-6 wires |
+| AI Features | ❌ | ❌ | ✅ Yes |
+| Object Tracking | ❌ | ❌ | ✅ Yes |
+| Power | ~20mA | ~15mA | ~25mA |
+| Lighting | Visible | Infrared | Infrared |
+| Best For | Prototyping | Production | AI-Enhanced Flight |
+| Price | $ | $$ | $$$ |
+
 ---
 
-**Happy Flying! 🚁**
+**Happy Flying! 🚁🤖**
