@@ -14,6 +14,8 @@ A complete optical flow-based position stabilization system for the Betafly dron
 
 - **Optical Flow Sensing**: Multiple sensor options for precise motion tracking
 - **Position Hold**: Maintains GPS-free position hold using visual odometry
+- **High Altitude Support**: Works reliably at 30m+ altitude with adaptive algorithms ⬆️
+- **Altitude-Adaptive Control**: Automatically adjusts filtering and gains based on altitude
 - **Velocity Damping**: Reduces drift and oscillations during flight
 - **PID Control**: Tunable PID controllers for X and Y axis stabilization
 - **Multiple Modes**: Off, velocity damping, and position hold modes
@@ -418,17 +420,19 @@ For detailed information about new features:
 - **[INSTALL.md](INSTALL.md)** - Installation and setup instructions
 - **[CADDX_INFRA256_GUIDE.md](CADDX_INFRA256_GUIDE.md)** - Caddx Infra 256 standard version setup
 - **[CADDX_INFRA256CA_AIBOX_GUIDE.md](CADDX_INFRA256CA_AIBOX_GUIDE.md)** - AI Box setup and configuration 🤖
+- **[HIGH_ALTITUDE_GUIDE.md](HIGH_ALTITUDE_GUIDE.md)** - High altitude operation (30m+) guide ⬆️
 
 ## Project Files
 
 ### Core System
 - `betafly_stabilizer.py` - Original basic control script
 - `betafly_stabilizer_advanced.py` - **New!** Advanced system with all features
-- `optical_flow_sensor.py` - PMW3901 sensor interface
+- `optical_flow_sensor.py` - PMW3901 sensor interface (with altitude-adaptive tracking)
 - `caddx_infra256.py` - Caddx Infra 256 standard driver (I2C)
 - `caddx_infra256_aibox.py` - **New!** Caddx Infra 256CA with AI Box driver 🤖
 - `camera_optical_flow.py` - **New!** Camera-based optical flow (USB/CSI/Analog)
-- `position_stabilizer.py` - PID control and stabilization algorithms
+- `altitude_source.py` - **New!** Multi-source altitude management (MAVLink, rangefinder, barometer) ⬆️
+- `position_stabilizer.py` - PID control with altitude-adaptive algorithms
 - `stick_input.py` - **New!** RC receiver input handling (SBUS/PWM)
 - `web_interface.py` - **New!** Flask web server and API
 
@@ -451,6 +455,7 @@ For detailed information about new features:
 - `INSTALL.md` - Installation guide
 - `CADDX_INFRA256_GUIDE.md` - Caddx Infra 256 standard setup
 - `CADDX_INFRA256CA_AIBOX_GUIDE.md` - **New!** AI Box setup and features 🤖
+- `HIGH_ALTITUDE_GUIDE.md` - **New!** High altitude operation (30m+) guide ⬆️
 
 ## Contributing
 

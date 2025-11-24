@@ -161,9 +161,11 @@ class PMW3901:
 class OpticalFlowTracker:
     """
     Higher-level optical flow tracking with position estimation
+    Supports high altitude operation (30+ meters) with adaptive filtering
     """
     
-    def __init__(self, sensor: PMW3901, scale_factor: float = 0.001, height_m: float = 0.5):
+    def __init__(self, sensor: PMW3901, scale_factor: float = 0.001, height_m: float = 0.5,
+                 max_altitude: float = 50.0, altitude_source=None):
         """
         Initialize optical flow tracker
         
@@ -171,10 +173,14 @@ class OpticalFlowTracker:
             sensor: PMW3901 sensor instance
             scale_factor: Conversion factor from sensor units to meters
             height_m: Height above ground in meters (affects scale)
+            max_altitude: Maximum supported altitude in meters
+            altitude_source: Optional altitude source for dynamic height updates
         """
         self.sensor = sensor
         self.scale_factor = scale_factor
         self.height_m = height_m
+        self.max_altitude = max_altitude
+        self.altitude_source = altitude_source
         
         # Position tracking
         self.pos_x = 0.0
@@ -186,14 +192,25 @@ class OpticalFlowTracker:
         
         self.last_update_time = time.time()
         
-        # Moving average filter for noise reduction
+        # Adaptive filtering for noise reduction
+        # Filter window increases with altitude for better noise rejection
         self.velocity_history_x = []
         self.velocity_history_y = []
-        self.filter_window = 5
+        self.base_filter_window = 5
+        self.filter_window = self.base_filter_window
+        
+        # High altitude parameters
+        self.altitude_scale_compensation = 1.0
+        self.quality_threshold_low_altitude = 50
+        self.quality_threshold_high_altitude = 30  # More lenient at high altitude
+        
+        # Tracking quality and confidence
+        self.tracking_confidence = 1.0  # 0.0 to 1.0
+        self.last_quality_check = time.time()
     
     def update(self) -> Tuple[float, float]:
         """
-        Update position estimate based on optical flow
+        Update position estimate based on optical flow with altitude adaptation
         
         Returns:
             Current estimated position (x, y) in meters
@@ -204,16 +221,34 @@ class OpticalFlowTracker:
         if dt < 0.001:  # Avoid division by zero
             return (self.pos_x, self.pos_y)
         
+        # Update altitude from external source if available
+        if self.altitude_source:
+            new_altitude = self.altitude_source.get_altitude()
+            if new_altitude is not None and new_altitude > 0:
+                self.height_m = new_altitude
+        
+        # Adapt filter parameters based on altitude
+        self._adapt_to_altitude()
+        
         # Get raw motion from sensor
         delta_x, delta_y = self.sensor.get_motion()
         
-        # Convert to velocity (m/s) accounting for height
-        # Optical flow scales with height above ground
-        scale = self.scale_factor * self.height_m
-        self.vel_x = (delta_x * scale) / dt
-        self.vel_y = (delta_y * scale) / dt
+        # Get surface quality for confidence estimation
+        quality = self.get_surface_quality()
         
-        # Apply moving average filter
+        # Update tracking confidence based on altitude and quality
+        self._update_tracking_confidence(quality)
+        
+        # Convert to velocity (m/s) accounting for height
+        # Optical flow scales linearly with height above ground
+        # At higher altitudes, apply compensation for reduced sensor sensitivity
+        scale = self.scale_factor * self.height_m * self.altitude_scale_compensation
+        
+        # Apply confidence scaling to velocities
+        self.vel_x = (delta_x * scale) / dt * self.tracking_confidence
+        self.vel_y = (delta_y * scale) / dt * self.tracking_confidence
+        
+        # Apply adaptive moving average filter
         self.velocity_history_x.append(self.vel_x)
         self.velocity_history_y.append(self.vel_y)
         
@@ -221,8 +256,13 @@ class OpticalFlowTracker:
             self.velocity_history_x.pop(0)
             self.velocity_history_y.pop(0)
         
-        filtered_vel_x = sum(self.velocity_history_x) / len(self.velocity_history_x)
-        filtered_vel_y = sum(self.velocity_history_y) / len(self.velocity_history_y)
+        # Use weighted average for high altitude (more weight on recent samples)
+        if self.height_m > 10.0:
+            filtered_vel_x = self._weighted_average(self.velocity_history_x)
+            filtered_vel_y = self._weighted_average(self.velocity_history_y)
+        else:
+            filtered_vel_x = sum(self.velocity_history_x) / len(self.velocity_history_x)
+            filtered_vel_y = sum(self.velocity_history_y) / len(self.velocity_history_y)
         
         # Integrate velocity to get position
         self.pos_x += filtered_vel_x * dt
@@ -231,6 +271,91 @@ class OpticalFlowTracker:
         self.last_update_time = current_time
         
         return (self.pos_x, self.pos_y)
+    
+    def _adapt_to_altitude(self):
+        """
+        Adapt filter parameters and scaling based on current altitude
+        High altitude requires more filtering and scale compensation
+        """
+        if self.height_m <= 5.0:
+            # Low altitude: minimal filtering, optimal sensor performance
+            self.filter_window = self.base_filter_window
+            self.altitude_scale_compensation = 1.0
+        elif self.height_m <= 15.0:
+            # Medium altitude: slight increase in filtering
+            self.filter_window = self.base_filter_window + 2
+            self.altitude_scale_compensation = 1.05
+        elif self.height_m <= 30.0:
+            # High altitude: significant filtering increase
+            self.filter_window = self.base_filter_window + 5
+            self.altitude_scale_compensation = 1.15
+        else:
+            # Very high altitude (30m+): maximum filtering
+            self.filter_window = self.base_filter_window + 10
+            # Compensate for reduced effective resolution at high altitude
+            self.altitude_scale_compensation = 1.20 + (self.height_m - 30.0) * 0.01
+            
+            # Warn if approaching max altitude
+            if self.height_m > self.max_altitude * 0.9:
+                logger.warning(f"Altitude {self.height_m:.1f}m approaching maximum {self.max_altitude}m")
+    
+    def _update_tracking_confidence(self, quality: int):
+        """
+        Update tracking confidence based on sensor quality and altitude
+        Confidence decreases at high altitude due to reduced sensor effectiveness
+        """
+        # Base confidence from sensor quality
+        if self.height_m <= 5.0:
+            quality_threshold = self.quality_threshold_low_altitude
+        else:
+            # Interpolate threshold based on altitude
+            quality_threshold = self.quality_threshold_low_altitude - (
+                (self.height_m / 30.0) * 
+                (self.quality_threshold_low_altitude - self.quality_threshold_high_altitude)
+            )
+        
+        # Calculate quality-based confidence
+        if quality >= quality_threshold:
+            quality_confidence = 1.0
+        else:
+            quality_confidence = max(0.3, quality / quality_threshold)
+        
+        # Altitude-based confidence degradation
+        if self.height_m <= 5.0:
+            altitude_confidence = 1.0
+        elif self.height_m <= 15.0:
+            altitude_confidence = 0.95
+        elif self.height_m <= 30.0:
+            altitude_confidence = 0.85
+        else:
+            # Confidence degrades above 30m
+            altitude_confidence = max(0.5, 0.85 - (self.height_m - 30.0) * 0.01)
+        
+        # Combined confidence
+        self.tracking_confidence = quality_confidence * altitude_confidence
+        
+        # Log warnings for low confidence
+        if current_time := time.time() > self.last_quality_check + 5.0:
+            if self.tracking_confidence < 0.6:
+                logger.warning(
+                    f"Low tracking confidence: {self.tracking_confidence:.2f} "
+                    f"(altitude: {self.height_m:.1f}m, quality: {quality})"
+                )
+            self.last_quality_check = current_time
+    
+    def _weighted_average(self, values: list) -> float:
+        """
+        Calculate weighted average with more weight on recent values
+        Useful for high altitude where sensor data is noisier
+        """
+        if not values:
+            return 0.0
+        
+        weights = [i + 1 for i in range(len(values))]  # Linear increasing weights
+        weighted_sum = sum(v * w for v, w in zip(values, weights))
+        weight_sum = sum(weights)
+        
+        return weighted_sum / weight_sum
     
     def get_velocity(self) -> Tuple[float, float]:
         """Get current velocity estimate in m/s"""
@@ -247,9 +372,36 @@ class OpticalFlowTracker:
         logger.info("Position reset to origin")
     
     def set_height(self, height_m: float):
-        """Update height above ground for accurate scaling"""
+        """
+        Update height above ground for accurate scaling
+        
+        Args:
+            height_m: Current altitude in meters
+        """
+        if height_m > self.max_altitude:
+            logger.warning(
+                f"Altitude {height_m:.1f}m exceeds maximum {self.max_altitude}m. "
+                f"Tracking accuracy may be degraded."
+            )
+        
         self.height_m = height_m
+        logger.debug(f"Altitude updated to {height_m:.1f}m")
     
     def get_surface_quality(self) -> int:
         """Get surface quality from sensor"""
         return self.sensor.get_surface_quality()
+    
+    def get_tracking_confidence(self) -> float:
+        """
+        Get current tracking confidence (0.0 to 1.0)
+        Indicates reliability of position estimate
+        """
+        return self.tracking_confidence
+    
+    def get_altitude(self) -> float:
+        """Get current altitude in meters"""
+        return self.height_m
+    
+    def is_altitude_valid(self) -> bool:
+        """Check if current altitude is within valid tracking range"""
+        return 0.1 <= self.height_m <= self.max_altitude

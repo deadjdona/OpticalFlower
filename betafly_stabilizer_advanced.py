@@ -18,6 +18,7 @@ from camera_optical_flow import CameraOpticalFlow, AnalogCameraFlow, auto_detect
 from position_stabilizer import StabilizationController, PIDGains
 from stick_input import StickInput, StickMixer, ModeSwitch
 from web_interface import app, system_state, state_lock, start_web_server
+from altitude_source import create_altitude_source, AltitudeSource
 
 # Try to import Caddx Infra 256
 try:
@@ -154,11 +155,23 @@ class BetaflyStabilizerAdvanced:
         else:
             raise ValueError(f"Unknown camera type: {camera_type}")
         
+        # Initialize altitude source if enabled
+        self.altitude_source = None
+        if self.config.get('altitude', {}).get('enabled', False):
+            try:
+                self.altitude_source = create_altitude_source(self.config['altitude'])
+                logger.info(f"Altitude source initialized: {type(self.altitude_source).__name__}")
+            except Exception as e:
+                logger.error(f"Failed to initialize altitude source: {e}")
+                self.altitude_source = None
+        
         # Initialize optical flow tracker
         self.tracker = OpticalFlowTracker(
             sensor=self.sensor,
             scale_factor=self.config['tracker']['scale_factor'],
-            height_m=self.config['tracker']['initial_height']
+            height_m=self.config['tracker']['initial_height'],
+            max_altitude=self.config['tracker'].get('max_altitude', 50.0),
+            altitude_source=self.altitude_source
         )
         
         # Initialize stabilization controller
@@ -169,7 +182,9 @@ class BetaflyStabilizerAdvanced:
             position_gains_x=position_gains_x,
             position_gains_y=position_gains_y,
             velocity_damping=self.config['stabilizer']['velocity_damping'],
-            max_tilt=self.config['stabilizer']['max_tilt_angle']
+            max_tilt=self.config['stabilizer']['max_tilt_angle'],
+            altitude_adaptive=self.config['stabilizer'].get('altitude_adaptive', True),
+            high_altitude_damping_boost=self.config['stabilizer'].get('high_altitude_damping_boost', 0.5)
         )
         
         # Initialize stick input if enabled
@@ -238,7 +253,13 @@ class BetaflyStabilizerAdvanced:
             },
             'tracker': {
                 'scale_factor': 0.001,
-                'initial_height': 0.5
+                'initial_height': 0.5,
+                'max_altitude': 50.0
+            },
+            'altitude': {
+                'enabled': False,
+                'type': 'static',
+                'fixed_altitude': 0.5
             },
             'pid': {
                 'position_x': {'kp': 0.5, 'ki': 0.1, 'kd': 0.2},
@@ -246,7 +267,9 @@ class BetaflyStabilizerAdvanced:
             },
             'stabilizer': {
                 'velocity_damping': 0.3,
-                'max_tilt_angle': 15.0
+                'max_tilt_angle': 15.0,
+                'altitude_adaptive': True,
+                'high_altitude_damping_boost': 0.5
             },
             'control': {
                 'update_rate_hz': 50
@@ -368,9 +391,10 @@ class BetaflyStabilizerAdvanced:
                     self.stabilizer.set_mode(rc_mode)
                     logger.info(f"Mode switched via RC to: {rc_mode}")
             
-            # Update stabilization controller
+            # Update stabilization controller with current altitude
+            current_altitude = self.tracker.get_altitude()
             pitch_correction, roll_correction = self.stabilizer.update(
-                pos_x, pos_y, vel_x, vel_y
+                pos_x, pos_y, vel_x, vel_y, altitude_m=current_altitude
             )
             
             # Mix with manual stick inputs if enabled
@@ -418,6 +442,8 @@ class BetaflyStabilizerAdvanced:
                 system_state['corrections'] = {'pitch': pitch_correction, 'roll': roll_correction}
                 system_state['surface_quality'] = surface_quality
                 system_state['height'] = self.tracker.height_m
+                system_state['tracking_confidence'] = self.tracker.get_tracking_confidence()
+                system_state['altitude_valid'] = self.tracker.is_altitude_valid()
                 system_state['stick_inputs'] = {
                     'pitch': stick_pitch,
                     'roll': stick_roll,
@@ -451,10 +477,14 @@ class BetaflyStabilizerAdvanced:
                 if ai_status_dict:
                     ai_str = f" | AI: {ai_status_dict.get('target_type', 'N/A')} ({ai_status_dict.get('confidence', 0):.2f})"
                 
+                # Add altitude and confidence info
+                altitude_str = f" | Alt: {self.tracker.get_altitude():.1f}m"
+                confidence_str = f" | Conf: {self.tracker.get_tracking_confidence():.2f}"
+                
                 logger.info(
                     f"Pos: ({pos_x:.3f}, {pos_y:.3f})m | "
                     f"Vel: ({vel_x:.3f}, {vel_y:.3f})m/s | "
-                    f"Cmd: P:{pitch_correction:.2f}° R:{roll_correction:.2f}°{stick_str}{ai_str} | "
+                    f"Cmd: P:{pitch_correction:.2f}° R:{roll_correction:.2f}°{stick_str}{ai_str}{altitude_str}{confidence_str} | "
                     f"Quality: {surface_quality} | Mode: {self.stabilizer.mode}"
                 )
             

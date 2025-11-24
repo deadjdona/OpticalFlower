@@ -12,7 +12,20 @@
   "tracker": {
     "scale_factor": 0.001,
     "initial_height": 0.5,
-    "comment": "scale_factor converts sensor units to meters, height is in meters"
+    "max_altitude": 50.0,
+    "comment": "scale_factor converts sensor units to meters, height is in meters, max_altitude is maximum supported altitude for optical flow"
+  },
+  "altitude": {
+    "enabled": false,
+    "type": "static",
+    "fixed_altitude": 0.5,
+    "connection": "/dev/ttyAMA0",
+    "baudrate": 115200,
+    "port": "/dev/ttyUSB0",
+    "protocol": "benewake",
+    "sensor": "bmp280",
+    "i2c_bus": 1,
+    "comment": "Altitude source for high altitude operation. type: static, mavlink, rangefinder, barometer, fused. For 30m+ altitude, use rangefinder or mavlink for best accuracy"
   },
   "pid": {
     "position_x": {
@@ -31,7 +44,9 @@
   "stabilizer": {
     "velocity_damping": 0.3,
     "max_tilt_angle": 15.0,
-    "comment": "velocity_damping: 0-1, max_tilt_angle in degrees"
+    "altitude_adaptive": true,
+    "high_altitude_damping_boost": 0.5,
+    "comment": "velocity_damping: 0-1, max_tilt_angle in degrees. altitude_adaptive increases damping at high altitude (30m+) for stability"
   },
   "control": {
     "update_rate_hz": 50,

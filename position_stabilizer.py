@@ -227,30 +227,54 @@ class PositionStabilizer:
 class VelocityDamper:
     """
     Velocity damping controller to reduce drift and oscillations
+    Supports altitude-adaptive damping for high altitude stability
     """
     
-    def __init__(self, damping_factor: float = 0.3, max_correction: float = 10.0):
+    def __init__(self, damping_factor: float = 0.3, max_correction: float = 10.0,
+                 altitude_adaptive: bool = True, high_altitude_boost: float = 0.5):
         """
         Initialize velocity damper
         
         Args:
-            damping_factor: How aggressively to damp velocity (0-1)
+            damping_factor: Base damping factor (0-1)
             max_correction: Maximum correction angle in degrees
+            altitude_adaptive: Enable altitude-adaptive damping
+            high_altitude_boost: Additional damping at high altitude (30m+)
         """
+        self.base_damping_factor = damping_factor
         self.damping_factor = damping_factor
         self.max_correction = max_correction
+        self.altitude_adaptive = altitude_adaptive
+        self.high_altitude_boost = high_altitude_boost
     
-    def compute_damping(self, vel_x: float, vel_y: float) -> Tuple[float, float]:
+    def compute_damping(self, vel_x: float, vel_y: float, altitude_m: Optional[float] = None) -> Tuple[float, float]:
         """
-        Compute damping corrections based on current velocity
+        Compute damping corrections based on current velocity with altitude adaptation
         
         Args:
             vel_x: Current X velocity in m/s
             vel_y: Current Y velocity in m/s
+            altitude_m: Current altitude in meters (for adaptive damping)
         
         Returns:
             Tuple of (pitch_damping, roll_damping) in degrees
         """
+        # Apply altitude-adaptive damping
+        if self.altitude_adaptive and altitude_m is not None:
+            if altitude_m > 30.0:
+                # High altitude: increase damping significantly
+                altitude_factor = 1.0 + self.high_altitude_boost + (altitude_m - 30.0) * 0.02
+            elif altitude_m > 15.0:
+                # Medium-high altitude: moderate increase
+                altitude_factor = 1.0 + (altitude_m - 15.0) / 30.0 * self.high_altitude_boost
+            else:
+                # Normal altitude: base damping
+                altitude_factor = 1.0
+            
+            self.damping_factor = self.base_damping_factor * altitude_factor
+        else:
+            self.damping_factor = self.base_damping_factor
+        
         # Damping opposes velocity
         roll_damping = -vel_x * self.damping_factor
         pitch_damping = -vel_y * self.damping_factor
@@ -265,31 +289,41 @@ class VelocityDamper:
 class StabilizationController:
     """
     Combined stabilization controller with position hold and velocity damping
+    Supports altitude-adaptive control for high altitude operations (30m+)
     """
     
     def __init__(self,
                  position_gains_x: PIDGains = PIDGains(kp=0.5, ki=0.1, kd=0.2),
                  position_gains_y: PIDGains = PIDGains(kp=0.5, ki=0.1, kd=0.2),
                  velocity_damping: float = 0.3,
-                 max_tilt: float = 15.0):
+                 max_tilt: float = 15.0,
+                 altitude_adaptive: bool = True,
+                 high_altitude_damping_boost: float = 0.5):
         """
         Initialize combined stabilization controller
         
         Args:
             position_gains_x: PID gains for X position control
             position_gains_y: PID gains for Y position control
-            velocity_damping: Velocity damping factor
+            velocity_damping: Base velocity damping factor
             max_tilt: Maximum tilt angle in degrees
+            altitude_adaptive: Enable altitude-adaptive damping
+            high_altitude_damping_boost: Additional damping boost at 30m+ altitude
         """
         self.position_stabilizer = PositionStabilizer(
             position_gains_x, position_gains_y, max_tilt
         )
-        self.velocity_damper = VelocityDamper(velocity_damping, max_tilt)
+        self.velocity_damper = VelocityDamper(
+            velocity_damping, max_tilt, altitude_adaptive, high_altitude_damping_boost
+        )
         
         # Mode selection
         self.mode = "off"  # "off", "velocity_damping", "position_hold"
         
-        logger.info("Stabilization controller initialized")
+        # Altitude tracking
+        self.current_altitude = None
+        
+        logger.info(f"Stabilization controller initialized (altitude_adaptive: {altitude_adaptive})")
     
     def set_mode(self, mode: str):
         """
@@ -313,15 +347,17 @@ class StabilizationController:
     
     def update(self, 
                current_x: float, current_y: float,
-               vel_x: float, vel_y: float) -> Tuple[float, float]:
+               vel_x: float, vel_y: float,
+               altitude_m: Optional[float] = None) -> Tuple[float, float]:
         """
-        Update stabilization controller
+        Update stabilization controller with altitude adaptation
         
         Args:
             current_x: Current X position in meters
             current_y: Current Y position in meters
             vel_x: Current X velocity in m/s
             vel_y: Current Y velocity in m/s
+            altitude_m: Current altitude in meters (for adaptive control)
         
         Returns:
             Tuple of (pitch_correction, roll_correction) in degrees
@@ -329,12 +365,18 @@ class StabilizationController:
         if self.mode == "off":
             return (0.0, 0.0)
         
+        # Update altitude tracking
+        if altitude_m is not None:
+            self.current_altitude = altitude_m
+        
         pitch_correction = 0.0
         roll_correction = 0.0
         
-        # Apply velocity damping
+        # Apply velocity damping with altitude adaptation
         if self.mode in ["velocity_damping", "position_hold"]:
-            pitch_damp, roll_damp = self.velocity_damper.compute_damping(vel_x, vel_y)
+            pitch_damp, roll_damp = self.velocity_damper.compute_damping(
+                vel_x, vel_y, altitude_m
+            )
             pitch_correction += pitch_damp
             roll_correction += roll_damp
         
