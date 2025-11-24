@@ -1,0 +1,74 @@
+{
+  "sensor": {
+    "type": "pmw3901",
+    "spi_bus": 0,
+    "spi_device": 0,
+    "i2c_bus": 1,
+    "i2c_address": 41,
+    "rotation": 0,
+    "comment": "type: pmw3901, caddx_infra256, usb_camera, csi_camera, analog_usb, opencv_any. i2c_address: 41 (0x29 default for Caddx)"
+  },
+  "tracker": {
+    "scale_factor": 0.001,
+    "initial_height": 0.5,
+    "comment": "scale_factor converts sensor units to meters, height is in meters"
+  },
+  "pid": {
+    "position_x": {
+      "kp": 0.5,
+      "ki": 0.1,
+      "kd": 0.2,
+      "comment": "PID gains for X-axis position control"
+    },
+    "position_y": {
+      "kp": 0.5,
+      "ki": 0.1,
+      "kd": 0.2,
+      "comment": "PID gains for Y-axis position control"
+    }
+  },
+  "stabilizer": {
+    "velocity_damping": 0.3,
+    "max_tilt_angle": 15.0,
+    "comment": "velocity_damping: 0-1, max_tilt_angle in degrees"
+  },
+  "control": {
+    "update_rate_hz": 50,
+    "comment": "Control loop frequency in Hz (recommended: 50-100)"
+  },
+  "logging": {
+    "enabled": false,
+    "file": "flight_log.csv",
+    "comment": "Enable data logging for analysis"
+  },
+  "camera": {
+    "device": 0,
+    "width": 640,
+    "height": 480,
+    "fps": 30,
+    "method": "farneback",
+    "deinterlace": true,
+    "comment": "For USB/CSI/Analog cameras. device: 0 or /dev/video0, method: farneback or lucas_kanade"
+  },
+  "stick_input": {
+    "enabled": false,
+    "protocol": "mock",
+    "device": "/dev/ttyAMA0",
+    "channels": 8,
+    "mix_ratio": 0.5,
+    "mode_channel": 4,
+    "comment": "protocol: sbus, ppm, pwm, mock. mix_ratio: 0.0=full stab, 1.0=full manual"
+  },
+  "output": {
+    "interface": "mavlink",
+    "port": "/dev/ttyAMA0",
+    "baudrate": 115200,
+    "comment": "Flight controller interface: mavlink, msp, or pwm"
+  },
+  "web_interface": {
+    "enabled": true,
+    "host": "0.0.0.0",
+    "port": 8080,
+    "comment": "Web GUI for configuration and monitoring"
+  }
+}
