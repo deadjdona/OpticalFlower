@@ -485,13 +485,16 @@ For detailed information about new features:
 - `stick_input.py` - **New!** RC receiver input handling (SBUS/PWM)
 - `web_interface.py` - **New!** Flask web server and API
 
+### Hardware Guides
+- `WIRING_GUIDE.md` - **New!** Complete wiring diagrams for all configurations 🔌
+
 ### Web Interface
 - `templates/index.html` - Web dashboard UI
 - `static/css/style.css` - Styling
 - `static/js/app.js` - Frontend JavaScript
 
 ### Configuration & Setup
-- `config.json` - **Updated!** Configuration file with camera and stick input options
+- `config.json` - **Updated!** Configuration file with all options (100m altitude support)
 - `setup.sh` - Automated setup script
 - `requirements.txt` - **Updated!** Python dependencies (includes OpenCV, Flask)
 

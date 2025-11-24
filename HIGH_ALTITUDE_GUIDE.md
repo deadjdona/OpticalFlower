@@ -411,7 +411,7 @@ Watch these metrics during high altitude hold:
 3. **Sensor Selection**:
    - Standard sensors: Good to ~15m
    - Caddx Infra 256: Good to ~30m
-   - Caddx 256CA AI Box: Best performance 30-50m (AI enhancement)
+   - Caddx 256CA Analog: Best performance 30-50m (analog video processing)
 
 4. **Slower Movements**:
    - Reduce maximum velocity
@@ -577,14 +577,21 @@ High altitude operation typically uses **10-20% more battery** due to:
 
 **Use Case**: Maximum altitude with emphasis on stability
 
-### Configuration 4: AI Box (Best Performance)
+### Configuration 4: Analog Camera (Advanced Processing)
 
 ```json
 {
   "sensor": {
-    "type": "caddx_infra256_aibox"
+    "type": "analog_usb"
   },
-  "ai_box": {
+  "camera": {
+    "device": "/dev/video0",
+    "width": 720,
+    "height": 480,
+    "fps": 30,
+    "method": "farneback"
+  },
+  "tracking": {
     "enabled": true,
     "mode": "stabilization_enhanced",
     "stabilization_strength": 0.8
