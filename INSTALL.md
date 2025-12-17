@@ -45,7 +45,7 @@ sudo reboot
 sudo apt-get update && sudo apt-get upgrade -y
 
 # 2. Install dependencies
-sudo apt-get install -y python3 python3-pip python3-dev git
+sudo apt-get install -y python3 python3-pip python3-dev git clang gcc
 
 # 3. Enable SPI
 sudo raspi-config
@@ -70,7 +70,8 @@ sudo reboot
 ```
 
 Expected output:
-```
+
+```bash
 ✓ Sensor initialized successfully
 ✓ Product ID: 0x49
 ```
@@ -102,16 +103,19 @@ nano config.json
 ### 2. Key Settings to Adjust
 
 **Sensor Rotation**: Match physical mounting
+
 ```json
 "rotation": 0  // 0, 90, 180, or 270 degrees
 ```
 
 **Flight Height**: Expected altitude above ground
+
 ```json
 "initial_height": 0.5  // meters
 ```
 
 **PID Gains**: Start conservative, tune later
+
 ```json
 "position_x": {
   "kp": 0.5,
@@ -164,6 +168,7 @@ sudo journalctl -u betafly-stabilizer.service -f
 
 1. Connect Pi TX to FC RX (telemetry/UART port)
 2. Update config:
+
 ```json
 "output": {
   "interface": "mavlink",
@@ -171,17 +176,20 @@ sudo journalctl -u betafly-stabilizer.service -f
   "baudrate": 115200
 }
 ```
+
 3. Implement `_send_corrections()` method for your protocol
 
 ### Option B: PWM Output
 
 1. Connect Pi GPIO pins to FC receiver inputs
 2. Update config:
+
 ```json
 "output": {
   "interface": "pwm"
 }
 ```
+
 3. Install pigpio: `sudo apt-get install pigpio python3-pigpio`
 4. Implement PWM generation in `_send_corrections()`
 
@@ -200,9 +208,11 @@ sudo journalctl -u betafly-stabilizer.service -f
 ### Test Procedure
 
 1. **Ground Test**
+
    ```bash
    ./betafly_stabilizer.py --mode velocity_damping --log
    ```
+
    - Move drone manually on ground
    - Verify sensor responds correctly
    - Check logs show reasonable values
@@ -285,7 +295,8 @@ sudo reboot
 ```
 
 Optional overclock (`/boot/config.txt`):
-```
+
+```bash
 arm_freq=1000
 over_voltage=2
 ```
@@ -293,6 +304,7 @@ over_voltage=2
 ### For Raspberry Pi Zero 2 W
 
 Can handle higher rates:
+
 ```json
 {
   "control": {

@@ -28,9 +28,11 @@ sudo apt-get upgrade -y
 echo "[2/6] Installing system dependencies..."
 sudo apt-get install -y \
     python3 \
+    python3-full \
     python3-pip \
     python3-dev \
     python3-setuptools \
+    python3-buildtools \
     git
 
 # Enable SPI
