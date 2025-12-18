@@ -1,0 +1,48 @@
+from distutils import log
+import numpy as np
+
+# The following function is called by the C code in the NumPy module, and
+# it logs the error to stderr.
+def _log_error(msg):
+    log.error(f"numpy error: {msg}")
+
+
+# The following function is called by the C code in the NumPy module, and
+# it logs the info to stderr.
+def _log_info(msg):
+    log.info(f"numpy info: {msg}")
+
+
+# This is the main function of the numpy package. It initializes the
+# numpy library by calling the init() function in the C code. Then, it
+# imports all the functions and classes from the numpy module and returns
+# them as a dictionary. Finally, it adds the package information (the name,
+# version, author, etc.) to the returned dictionary and returns it.
+def import_all():
+    # initialize the numpy library
+    init = np.init()
+    # check if the numpy library is already initialized
+    if init != 0:
+        return None
+    # import all functions and classes from numpy module
+    fns = {}
+    cls = {}
+    for name, func in np.__dict__.items():
+        if callable(func):
+            fns[name] = func
+        elif isinstance(func, type):
+            cls[name] = func
+    # add the package information to the returned dictionary
+    info = {
+        'name': 'numpy',
+        'version': np.version.full_version,
+        'author': 'Numpy Developers',
+        'license': 'BSD 3-Clause',
+        'copyright': 'Copyright (c) 2018, NumPy Developers.',
+    }
+    # return the dictionary with all functions and classes from numpy module
+    return {'fns': fns, 'cls': cls, 'info': info}
+
+# Call import_all() function to get the dictionary of functions and classes
+data = import_all()
+print(data)
