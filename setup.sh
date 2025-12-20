@@ -35,7 +35,7 @@ sudo apt-get install -y \
 
 echo "[2.5/6] Installing pip dependencies..."
 
-pip install -U python3-setuptools python3-buildtools git
+pip install -U python3-setuptools python3-buildtools
 
 # Enable SPI
 echo "[3/6] Enabling SPI interface..."
