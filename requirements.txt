@@ -15,11 +15,11 @@ Flask>=2.0.0       # Web server framework +++ // sudo apt install python3-flask
 Flask-CORS>=3.0.0  # Cross-origin resource sharing ++++ // sudo apt install python3-flask-cors
 
 # Optional dependencies for flight controller communication
-pymavlink>=2.4.37  # For MAVLink protocol --------
+pymavlink>=2.4.37  # For MAVLink protocol -------- // sudo apt install python3-pymavlink
 pyserial>=3.5      # For serial communication (SBUS/MSP) // sudo apt install python3-serial
 
 # Data processing and utilities
-# numpy>=1.21.0      # For advanced math operations
+# numpy>=1.21.0      # For advanced math operations // sudo apt install python3-numpy
 
 # Development and testing
 pytest>=7.0.0      # For unit tests // sudo apt install python3-pytest

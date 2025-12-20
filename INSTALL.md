@@ -1,5 +1,7 @@
 # Installation Guide
 
+https://visualstudio.microsoft.com/visual-cpp-build-tools/
+
 ## Hardware Setup
 
 ### 1. Connect PMW3901 Sensor to Raspberry Pi Zero
