@@ -33,9 +33,11 @@ sudo apt-get install -y \
     python3-dev \
     git
 
-echo "[2.5/6] Installing pip dependencies..."
+# venv for pip
+echo "[2.5/6] Installing venv"
 
-pip install -U python3-setuptools python3-buildtools
+python -m venv --system-site-packages optic
+source optic/bin/activate
 
 # Enable SPI
 echo "[3/6] Enabling SPI interface..."
