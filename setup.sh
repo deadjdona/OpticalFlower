@@ -36,7 +36,7 @@ sudo apt-get install -y \
 # venv for pip
 echo "[2.5/6] Installing venv"
 
-python -m venv --system-site-packages optic
+# python -m venv --system-site-packages optic
 source optic/bin/activate
 
 # Enable SPI
