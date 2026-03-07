@@ -21,15 +21,15 @@ The Raspberry Pi Zero can act as a **GPS module** for the flight controller, sen
 └────────┬────────┘
          │ UART (GPS data)
          ↓
-┌─────────────────┐
+┌─────────────────────────────────────┐
 │ Flight Controller│
 │ - Receives "GPS" data
 │ - Thinks GPS is connected
 │ - Does position hold with GPS mode
-└─────────────────┘
+└─────────────────────────────────────┘
 ```
 
-##Benefits
+## Benefits
 
 ### Why GPS Emulation?
 
