@@ -26,7 +26,7 @@ class PIDController:
     """
     
     def __init__(self, gains: PIDGains, output_limits: Tuple[float, float] = (-1.0, 1.0)):
-        """
+        """s
         Initialize PID controller
         
         Args:
@@ -50,56 +50,44 @@ class PIDController:
     def update(self, setpoint: float, measured: float, current_time: Optional[float] = None) -> float:
         """
         Update PID controller and compute output
-        
-        Args:
-            setpoint: Desired value
-            measured: Current measured value
-            current_time: Current time (if None, uses time.time())
-        
-        Returns:
-            Control output
         """
         if current_time is None:
             current_time = time.time()
-        
-        # Calculate error
-        error = setpoint - measured
-        
-        # Initialize on first call
+
+        # Check if this is the first execution
         if self.prev_time is None:
             self.prev_time = current_time
-            self.prev_error = error
             return 0.0
-        
-        # Calculate time delta
+
         dt = current_time - self.prev_time
         if dt <= 0:
             return 0.0
+            
+        error = setpoint - measured
         
         # Proportional term
         p_term = self.kp * error
         
         # Integral term with anti-windup
         self.integral += error * dt
-        self.integral = max(-self.integral_limit, min(self.integral_limit, self.integral))
+        self.integral = max(min(self.integral, self.integral_limit), -self.integral_limit)
         i_term = self.ki * self.integral
         
         # Derivative term
-        derivative = (error - self.prev_error) / dt
-        d_term = self.kd * derivative
+        d_term = self.kd * (error - self.prev_error) / dt
         
-        # Compute output
+        # Compute total output
         output = p_term + i_term + d_term
         
         # Apply output limits
-        output = max(self.output_min, min(self.output_max, output))
+        output = max(min(output, self.output_max), self.output_min)
         
-        # Update state
+        # Save state for next update
         self.prev_error = error
         self.prev_time = current_time
         
         return output
-    
+      
     def reset(self):
         """Reset controller state"""
         self.integral = 0.0
