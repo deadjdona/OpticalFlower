@@ -19,7 +19,7 @@ pymavlink>=2.4.37  # For MAVLink protocol -------- // sudo apt install python3-p
 pyserial>=3.5      # For serial communication (SBUS/MSP) // sudo apt install python3-serial
 
 # Data processing and utilities
-numpy>=1.21.0      # For advanced math operations // sudo apt install python3-numpy
+numpy>=2.5.2      # For advanced math operations // sudo apt install python3-numpy
 
 # Development and testing
 pytest>=7.0.0      # For unit tests // sudo apt install python3-pytest
