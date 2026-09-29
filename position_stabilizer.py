@@ -43,6 +43,7 @@ class PIDController:
         self.integral = 0.0
         self.prev_error = 0.0
         self.prev_time = None
+        self.filtered_derivative = 0.0
         
         # Anti-windup limits
         self.integral_limit = 1.0
@@ -50,8 +51,6 @@ class PIDController:
     def update(self, setpoint: float, measured: float, current_time: Optional[float] = None) -> float:
         """
         Update PID controller and compute output
-<<<<<<< HEAD
-=======
         Optimized with derivative filtering and improved anti-windup
         
         Args:
@@ -61,7 +60,6 @@ class PIDController:
         
         Returns:
             Control output
->>>>>>> flowr/main
         """
         if current_time is None:
             current_time = time.time()
@@ -69,8 +67,11 @@ class PIDController:
         # Check if this is the first execution
         if self.prev_time is None:
             self.prev_time = current_time
+            self.prev_error = setpoint - measured
+            self.filtered_derivative = 0.0
             return 0.0
 
+        # Calculate time delta
         dt = current_time - self.prev_time
         if dt <= 0 or dt > 1.0:  # Reject invalid dt (> 1s likely system suspend)
             self.prev_time = current_time
@@ -81,15 +82,6 @@ class PIDController:
         # Proportional term
         p_term = self.kp * error
         
-<<<<<<< HEAD
-        # Integral term with anti-windup
-        self.integral += error * dt
-        self.integral = max(min(self.integral, self.integral_limit), -self.integral_limit)
-        i_term = self.ki * self.integral
-        
-        # Derivative term
-        d_term = self.kd * (error - self.prev_error) / dt
-=======
         # Integral term with conditional integration (anti-windup)
         # Only integrate if output is not saturated
         output_unsaturated = p_term + self.ki * self.integral
@@ -105,13 +97,12 @@ class PIDController:
         else:
             self.filtered_derivative = derivative
         d_term = self.kd * self.filtered_derivative
->>>>>>> flowr/main
         
         # Compute total output
         output = p_term + i_term + d_term
         
         # Apply output limits
-        output = max(min(output, self.output_max), self.output_min)
+        output = max(self.output_min, min(self.output_max, output))
         
         # Save state for next update
         self.prev_error = error
@@ -124,6 +115,7 @@ class PIDController:
         self.integral = 0.0
         self.prev_error = 0.0
         self.prev_time = None
+        self.filtered_derivative = 0.0
 
 
 class PositionStabilizer:

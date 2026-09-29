@@ -1,11 +1,11 @@
-# Betafly Optical Position Stabilization
+# OpticalFlower: Optical Position Stabilization System
 
-A complete optical flow-based position stabilization system for the Betafly drone, optimized for Raspberry Pi Zero.
+A complete optical flow and visual position stabilization system for UAVs and drones (Betaflight, iNav, ArduPilot, PX4), optimized for Raspberry Pi Zero / Zero 2 W and Linux SBCs.
 
-> **📌 NOTE**: This is the **universal `main` branch** supporting all flight controllers.  
-> For optimized versions, see:
-> - **[`betaflight` branch](../../tree/betaflight)** - Optimized for Betaflight/iNav (NMEA GPS)
-> - **[`ardupilot` branch](../../tree/ardupilot)** - Optimized for ArduPilot/PX4 (MAVLink GPS)
+> **📌 NOTE**: This is the **universal `main` branch** supporting all flight controllers and sensors.  
+> For optimized configurations, see:
+> - **[`betaflight` branch](../../tree/betaflight)** - Optimized for Betaflight/iNav (NMEA GPS emulation)
+> - **[`ardupilot` branch](../../tree/ardupilot)** - Optimized for ArduPilot/PX4 (MAVLink GPS / telemetry)
 > - **[Branch Comparison](BRANCH_INFO.md)** - Detailed comparison and selection guide
 
 ## ✨ New Features
@@ -130,25 +130,34 @@ sudo raspi-config
 
 ```bash
 cd ~
-git clone https://github.com/yourusername/betafly-stabilization.git
-cd betafly-stabilization
+git clone https://github.com/deadjdona/OpticalFlower.git
+cd OpticalFlower
 ```
 
 ### 3. Install Dependencies
 
 ```bash
-# Install Python packages
-pip3 install -r requirements.txt
+# Automated setup (creates venv and installs dependencies):
+chmod +x setup.sh
+./setup.sh
 
-# Make main script executable
-chmod +x betafly_stabilizer.py
+# Or manual installation:
+python3 -m venv --system-site-packages optic
+source optic/bin/activate
+pip install -r requirements.txt
+chmod +x betafly_stabilizer.py betafly_stabilizer_advanced.py main.py
 ```
 
 ### 4. Test Sensor Connection
 
 ```bash
-# Quick sensor test
-python3 -c "from optical_flow_sensor import PMW3901; s = PMW3901(); print('Sensor OK')"
+# Test sensor via test utility:
+python3 test_sensor.py -s pmw3901    # for PMW3901 SPI
+python3 test_sensor.py -s caddx      # for Caddx Infra 256 / 256CA
+python3 test_sensor.py -s camera     # for USB / CSI / Analog camera
+
+# Or run automated unit tests:
+pytest -v
 ```
 
 ## Configuration
@@ -200,14 +209,17 @@ Edit `config.json` to customize the system for your setup:
 
 ## Usage
 
-### Quick Start with Web Interface
+### Quick Start
 
 ```bash
-# Start advanced system with web interface (recommended)
+# Option 1: Unified runner with auto-detection & web interface (recommended)
+python3 main.py
+
+# Option 2: Direct advanced stabilizer script
 ./betafly_stabilizer_advanced.py
 
 # Access web interface at:
-# http://raspberrypi.local:8080
+# http://raspberrypi.local:8080 (or http://<pi-ip>:8080)
 ```
 
 The web interface provides:
@@ -509,41 +521,65 @@ For detailed information about new features:
 
 ## Project Files
 
-### Core System
-- `betafly_stabilizer.py` - Original basic control script
-- `betafly_stabilizer_advanced.py` - **New!** Advanced system with all features
-- `optical_flow_sensor.py` - PMW3901 sensor interface (with altitude-adaptive tracking)
+### Core System & Entry Points
+- `main.py` - Unified runner supporting CLI, web interface, GPS emulation, and hardware auto-detection
+- `betafly_stabilizer_advanced.py` - Advanced stabilization system with web UI and all features
+- `betafly_stabilizer.py` - Original lightweight control script
+- `caddx_infra256ca.py` - Driver for Caddx Infra 256CA + AI Box (Serial/TCP streaming + height feed)
 - `caddx_infra256.py` - Caddx Infra 256 driver (I2C)
-- `camera_optical_flow.py` - **New!** Camera-based optical flow (USB/CSI/Analog, includes Caddx 256CA)
-- `altitude_source.py` - **New!** Multi-source altitude management (MAVLink, rangefinder, barometer) ⬆️
-- `gps_emulation.py` - **New!** GPS emulation for flight controller (NMEA/MAVLink) 📡
-- `position_stabilizer.py` - PID control with altitude-adaptive algorithms
-- `stick_input.py` - **New!** RC receiver input handling (SBUS/PWM)
-- `web_interface.py` - **New!** Flask web server and API
+- `optical_flow_sensor.py` - PMW3901 sensor interface (SPI, with altitude-adaptive tracking)
+- `camera_optical_flow.py` - Computer-vision optical flow (USB/CSI/Analog cameras)
+- `sensor_factory.py` - Factory pattern for dynamic sensor creation and auto-detection
+- `altitude_source.py` - Multi-source altitude fusion (MAVLink, rangefinder, barometer) ⬆️
+- `gps_emulation.py` - GPS emulation engine (NMEA/MAVLink) for flight controller integration 📡
+- `virtual_gps.py` - Standalone virtual GPS emulator module
+- `position_stabilizer.py` - PID control with altitude-adaptive filtering and anti-windup
+- `stick_input.py` - RC receiver input handling (SBUS/PWM)
+- `web_interface.py` - Flask web server and telemetry API
+- `calibrate.py` / `calibrate_thermal.py` - Camera and thermal calibration utilities
 
 ### Hardware Guides
-- `WIRING_GUIDE.md` - **New!** Complete wiring diagrams for all configurations 🔌
+- `WIRING_GUIDE.md` - Complete wiring diagrams for all configurations 🔌
+- `CAMERA_SETUP.md` - Raspberry Pi CSI, USB, and analog camera setup guide
 
 ### Web Interface
+- `web/server.py` - Standalone web server entrypoint
 - `templates/index.html` - Web dashboard UI
 - `static/css/style.css` - Styling
 - `static/js/app.js` - Frontend JavaScript
 
 ### Configuration & Setup
-- `config.json` - **Updated!** Configuration file with all options (100m altitude support)
-- `setup.sh` - Automated setup script
-- `requirements.txt` - **Updated!** Python dependencies (includes OpenCV, Flask)
+- `config.json` - Configuration file with all options (100m altitude support)
+- `setup.sh` - Automated environment setup script
+- `requirements.txt` - Python dependencies (OpenCV, Flask, PySerial, PyMAVLink, etc.)
+- `pyproject.toml` - Project configuration and pytest settings
 
-### Testing & Utilities
-- `test_sensor.py` - Sensor testing utility
+### Testing & Verification
+- `tests/test_basic.py` - Automated pytest suite covering imports, sensor loading, PID controllers, and position stabilization
+- `test_sensor.py` - Hardware sensor diagnostic utility (`-s {camera,pmw3901,caddx}`)
 
 ### Documentation
-- `README.md` - This file
-- `FEATURES.md` - **New!** Detailed guide for new features
-- `INSTALL.md` - Installation guide
-- `CADDX_INFRA256_GUIDE.md` - Caddx Infra 256 (I2C) setup guide
-- `VISUAL_COORDINATES_GUIDE.md` - **New!** Visual coordinates and barometer integration 📹
-- `HIGH_ALTITUDE_GUIDE.md` - **New!** High altitude operation (30m+) guide ⬆️
+- `README.md` - Project overview and quick start guide
+- `FEATURES.md` - Detailed guide for all features
+- `INSTALL.md` - Comprehensive installation and troubleshooting guide
+- `CADDX_INFRA256_GUIDE.md` - Caddx Infra 256 (I2C) and 256CA + AI Box guide
+- `VISUAL_COORDINATES_GUIDE.md` - Visual coordinates and barometer integration 📹
+- `HIGH_ALTITUDE_GUIDE.md` - High altitude operation (30m+) guide ⬆️
+- `instruction.md` - Step-by-step setup guide for Raspberry Pi (Ukrainian / Russian)
+
+## Running Tests
+
+Run the unit test suite:
+```bash
+pytest -v
+```
+
+Run interactive hardware diagnostics:
+```bash
+python3 test_sensor.py -s pmw3901     # Test PMW3901 SPI sensor
+python3 test_sensor.py -s caddx       # Test Caddx I2C / AI Box sensor
+python3 test_sensor.py -s camera      # Test CSI / USB / Analog camera
+```
 
 ## Contributing
 
@@ -574,31 +610,32 @@ MIT License - See LICENSE file for details
 ## Support
 
 For issues, questions, or contributions:
-- GitHub Issues: https://github.com/yourusername/betafly-stabilization/issues
-- Documentation: https://github.com/yourusername/betafly-stabilization/wiki
+- GitHub Issues: https://github.com/deadjdona/OpticalFlower/issues
+- Repository: https://github.com/deadjdona/OpticalFlower
 
 ## Credits
 
-Developed for the Betafly drone project using:
+Developed for the Betafly / OpticalFlower drone project using:
 - PMW3901 optical flow sensor
 - Caddx Infra 256 (I2C) optical flow sensor
+- Caddx Infra 256CA + AI Box (Serial/TCP)
 - Caddx Infra 256CA (analog camera) with computer vision
-- Raspberry Pi Zero platform
+- Raspberry Pi Zero / Zero 2 W platform
 - PID control theory
 - Visual odometry principles
 
 ## Sensor Comparison Quick Reference
 
-| Feature | PMW3901 | Caddx Infra 256 | Caddx Infra 256CA |
-|---------|---------|----------------|-------------------|
-| Interface | SPI | I2C | Analog CVBS |
-| Wiring | 6 wires | 4 wires | 3 wires + USB capture |
-| Direct Connection | Yes | Yes | No (needs capture card) |
-| Power | ~20mA | ~15mA | ~100mA |
-| Lighting | Visible | Infrared | Infrared |
-| Video Output | No | No | Yes (analog) |
-| Best For | Prototyping | Production I2C | Analog FPV + Optical Flow |
-| Price | $ | $$ | $$ |
+| Feature | PMW3901 | Caddx Infra 256 | Caddx Infra 256CA (Analog) | Caddx Infra 256CA + AI Box |
+|---------|---------|-----------------|----------------------------|----------------------------|
+| Interface | SPI | I2C | Analog CVBS | Serial (USB) / TCP |
+| Wiring | 6 wires | 4 wires | 3 wires + USB capture | USB Cable or Ethernet |
+| Direct Connection | Yes | Yes | No (needs capture card) | Yes (Plug & Play) |
+| Power | ~20mA | ~15mA | ~100mA | 5V 500mA (from Pi USB) |
+| Lighting | Visible | Infrared | Infrared | Infrared |
+| Video Output | No | No | Yes (analog FPV) | Sensor stream + Height feed |
+| Best For | Prototyping | Production I2C | Analog FPV + Optical Flow | High-precision production |
+| Price | $ | $$ | $$ | $$$ |
 
 ---
 

@@ -107,8 +107,8 @@ This repository has multiple optimized branches for different flight controller 
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/betafly-stabilization.git
-cd betafly-stabilization
+git clone https://github.com/deadjdona/OpticalFlower.git
+cd OpticalFlower
 
 # For Betaflight
 git checkout betaflight
