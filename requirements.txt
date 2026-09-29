@@ -4,7 +4,7 @@
 # Core dependencies
 spidev>=3.5  # For PMW3901 + // sudo apt install python3-spidev
 RPi.GPIO>=0.7.1 # + // sudo apt install python3-rpi.gpio
-smbus2>=0.4.0  # For Caddx Infra 256 (I2C) + // sudo apt install python3-smbus2
+smbus2>=0.6.1  # For Caddx Infra 256 (I2C) + // sudo apt install python3-smbus2
 
 # Camera and computer vision
 opencv-python>=4.5.0  # For camera-based optical flow // 600 Mb // sudo apt install python3-opencv
