@@ -98,8 +98,8 @@ git checkout main
 
 ### Betaflight Users:
 ```bash
-git clone https://github.com/deadjdona/OpticalFlower.git
-cd OpticalFlower
+git clone <repo-url>
+cd betafly-stabilization
 git checkout betaflight
 cp config.betaflight.json config.json
 # Edit config.json with your home position
@@ -108,8 +108,8 @@ cp config.betaflight.json config.json
 
 ### ArduPilot Users:
 ```bash
-git clone https://github.com/deadjdona/OpticalFlower.git
-cd OpticalFlower
+git clone <repo-url>
+cd betafly-stabilization
 git checkout ardupilot
 cp config.ardupilot.json config.json
 # Edit config.json with your home position
@@ -118,8 +118,8 @@ cp config.ardupilot.json config.json
 
 ### Universal Setup:
 ```bash
-git clone https://github.com/deadjdona/OpticalFlower.git
-cd OpticalFlower
+git clone <repo-url>
+cd betafly-stabilization
 # Edit config.json for your specific setup
 ./betafly_stabilizer_advanced.py
 ```

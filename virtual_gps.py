@@ -379,7 +379,7 @@ if __name__ == '__main__':
         )
         
         if vgps.is_connected():
-            print("[OK] Connected to flight controller")
+            print("✓ Connected to flight controller")
             print(f"  System ID: {vgps.system_id}")
             print(f"  Origin: lat={vgps.origin_lat:.6f}, lon={vgps.origin_lon:.6f}")
             
@@ -415,17 +415,17 @@ if __name__ == '__main__':
                 vgps.send_gps_input(x, y, z, vx, vy, vz)
                 time.sleep(0.2)  # 5 Hz
             
-            print("[OK] Test complete!")
+            print("✓ Test complete!")
             vgps.close()
             
         else:
-            print("[FAIL] Failed to connect to flight controller")
+            print("✗ Failed to connect to flight controller")
             print("  Check:")
             print("  - Serial connection (/dev/ttyAMA0)")
             print("  - Flight controller powered on")
             print("  - Correct baudrate (115200)")
             
     except Exception as e:
-        print(f"[ERROR] {e}")
+        print(f"✗ Error: {e}")
         import traceback
         traceback.print_exc()

@@ -1,6 +1,6 @@
 #!/bin/bash
-# Setup script for Betafly Position Stabilization System
-# Run this script on your Raspberry Pi Zero / Zero 2 W / Pi 4
+# Setup script for Betafly Camera-Based Position Stabilization
+# Run this script on your Raspberry Pi Zero
 
 set -e
 
@@ -33,40 +33,26 @@ sudo apt-get install -y \
     python3-dev \
     git
 
-# venv setup
-echo "[2.5/6] Setting up Python virtual environment..."
-if [ ! -d "optic" ]; then
-    python3 -m venv --system-site-packages optic
-fi
+<<<<<<< HEAD
+# venv for pip
+echo "[2.5/6] Installing venv"
+
+# python -m venv --system-site-packages optic
 source optic/bin/activate
 
-# Enable hardware interfaces (SPI and Camera)
-echo "[3/6] Enabling hardware interfaces (SPI and Camera)..."
-REBOOT_REQUIRED=0
-
-# Enable SPI for PMW3901
-if ! grep -q "^dtparam=spi=on" /boot/config.txt 2>/dev/null; then
+# Enable SPI
+echo "[3/6] Enabling SPI interface..."
+if ! grep -q "^dtparam=spi=on" /boot/config.txt; then
     echo "dtparam=spi=on" | sudo tee -a /boot/config.txt
     echo "SPI enabled (reboot required)"
-    REBOOT_REQUIRED=1
-else
-    echo "SPI already enabled"
-fi
-
-# Enable I2C for Caddx Infra 256
-if ! grep -q "^dtparam=i2c_arm=on" /boot/config.txt 2>/dev/null; then
-    echo "dtparam=i2c_arm=on" | sudo tee -a /boot/config.txt
-    echo "I2C enabled (reboot required)"
-    REBOOT_REQUIRED=1
-else
-    echo "I2C already enabled"
-fi
-
-# Enable Camera for CSI/USB cameras
-if ! grep -q "^start_x=1" /boot/config.txt 2>/dev/null; then
+=======
+# Enable Camera
+echo "[3/6] Enabling Camera interface..."
+if ! grep -q "^start_x=1" /boot/config.txt; then
     echo "start_x=1" | sudo tee -a /boot/config.txt
     echo "gpu_mem=128" | sudo tee -a /boot/config.txt
     echo "Camera enabled (reboot required)"
+>>>>>>> flowr/main
     REBOOT_REQUIRED=1
 else
     echo "Camera already enabled"
@@ -79,13 +65,13 @@ pip3 install -r requirements.txt
 
 # Make scripts executable
 echo "[5/6] Setting file permissions..."
-chmod +x betafly_stabilizer.py betafly_stabilizer_advanced.py main.py calibrate.py calibrate_thermal.py test_sensor.py setup.sh 2>/dev/null || true
+chmod +x betafly_stabilizer.py
 
 # Test installation
 echo "[6/6] Testing installation..."
-python3 -c "import cv2; print('✓ OpenCV installed')" 2>/dev/null || echo "⚠️ OpenCV not installed (optional, needed for camera flow)"
-python3 -c "from camera_optical_flow import CameraOpticalFlow; print('✓ camera_optical_flow OK')" 2>/dev/null || true
-python3 -c "from position_stabilizer import PositionStabilizer; print('✓ position_stabilizer OK')" 2>/dev/null || true
+python3 -c "import cv2; print('✓ OpenCV installed')"
+python3 -c "from camera_optical_flow import CameraOpticalFlow; print('✓ camera_optical_flow OK')"
+python3 -c "from position_stabilizer import StabilizationController; print('✓ position_stabilizer OK')"
 
 echo ""
 echo "================================================"
@@ -94,7 +80,7 @@ echo "================================================"
 echo ""
 
 if [ "$REBOOT_REQUIRED" = "1" ]; then
-    echo "⚠️  REBOOT REQUIRED to enable hardware interfaces"
+    echo "⚠️  REBOOT REQUIRED to enable Camera interface"
     echo ""
     read -p "Reboot now? (y/n) " -n 1 -r
     echo
@@ -106,8 +92,6 @@ else
     echo "  ./betafly_stabilizer.py --help"
     echo "  or"
     echo "  ./betafly_stabilizer_advanced.py"
-    echo "  or"
-    echo "  python main.py"
 fi
 
 echo ""
