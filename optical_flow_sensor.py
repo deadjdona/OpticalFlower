@@ -4,12 +4,20 @@ Supports PMW3901 and Caddx Infra 256 optical flow sensors for position tracking
 """
 
 import time
-import spidev
 from typing import Tuple, Optional, Union
 import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Try to import spidev (Raspberry Pi SPI bus)
+try:
+    import spidev
+    SPIDEV_AVAILABLE = True
+except ImportError:
+    spidev = None
+    SPIDEV_AVAILABLE = False
+    logger.warning("spidev not available - PMW3901 SPI disabled")
 
 # Try to import Caddx Infra 256
 try:
@@ -51,6 +59,8 @@ class PMW3901:
             spi_device: SPI device number (default 0)
             rotation: Sensor rotation in degrees (0, 90, 180, 270)
         """
+        if not SPIDEV_AVAILABLE:
+            raise RuntimeError("spidev not available - PMW3901 requires SPI on Linux/Raspberry Pi")
         self.spi = spidev.SpiDev()
         self.spi.open(spi_bus, spi_device)
         self.spi.max_speed_hz = 2000000

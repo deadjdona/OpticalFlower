@@ -435,6 +435,97 @@ SPI SCLK [23] [24]  SPI CE0 ← PMW3901 CS
 
 ---
 
+## Configuration 5: Caddx Infra 256CA + AI Box (Serial / TCP)
+
+**Use Case**: Plug-and-play optical flow streaming with built-in height feed  
+**Flight Controller**: Any (Betaflight, iNav, ArduPilot, PX4)  
+**Sensor**: Caddx Infra 256CA connected to external AI Box  
+**Interface**: USB Serial (`/dev/ttyUSB0` at 921600 baud) or TCP / Ethernet (`8899`)  
+
+### Wiring Diagram
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│                  RASPBERRY PI ZERO / 2W                        │
+│                                                                │
+│  Pin 2  [5V]   ────────────────────────────┐                 │
+│  Pin 6  [GND]  ──────────────────────────┐ │                 │
+│  Pin 8  [TX]   ────────────────────────┐ │ │                 │
+│                                        │ │ │                 │
+│  USB Data Port ─────────────┐          │ │ │                 │
+│                             │          │ │ │                 │
+└─────────────────────────────┼──────────┼─┼─┼─────────────────┘
+                              │          │ │ │
+                              │          │ │ │
+  Caddx Infra 256CA + AI Box  │          │ │ │
+  ──────────────────────────  │          │ │ │         Power
+                              │          │ │ │         ─────
+┌───────────────────────────┐ │          │ │ │
+│ Caddx Infra 256CA Sensor  │ │          │ │ │     ┌───────────┐
+│                           │ │          │ │ │     │    BEC    │
+│ Ribbon Cable              │ │          │ │ │     │  5V 2.5A+ │
+│             │             │ │          │ │ │     │ 5V        │
+│             ▼             │ │          │ │ │     │ GND       │
+│ AI Box Processing Unit    │ │          │ │ │     └─────┬─────┘
+│                           │ │          │ │ │           │
+│ USB Port (Data + 5V) ─────┼─┘          │ │ │           │
+│ (or Ethernet / Wi-Fi)     │            │ │ │           │
+└───────────────────────────┘            │ │ │           │
+                                         │ │ │           │
+                               Flight Controller         │
+                               ──────────────────        │
+                                         │ │ │           │
+                             ┌───────────┼─┼─┼───────────┘
+                             │           │ │ │
+                             │  GPS RX ←─┘ │ │
+                             │  GND ───────┴─┘
+                             │  5V ──────────
+                             └───────────────────────────┘
+```
+
+### Connections Table
+
+| Component A | → | Component B | Function |
+|-------------|---|-------------|----------|
+| 256CA Sensor | → | AI Box Ribbon | Raw sensor feed |
+| AI Box USB | → | Pi USB Data Port | Serial streaming (921600 baud) |
+| Pi Pin 2 (5V) | ← | BEC 5V | Pi power |
+| Pi Pin 6 (GND) | → | Common GND | Ground |
+| Pi Pin 8 (TX) | → | FC GPS RX | Emulated GPS data |
+
+### Configuration
+
+```json
+{
+  "sensor": {
+    "type": "caddx_infra256ca",
+    "rotation": 0,
+    "ai_box": {
+      "connection": "serial",
+      "serial_port": "/dev/ttyUSB0",
+      "serial_baudrate": 921600,
+      "tcp_host": "",
+      "tcp_port": 8899,
+      "data_timeout": 0.25,
+      "height_scale": 1.0
+    }
+  },
+  "gps_emulation": {
+    "enabled": true,
+    "protocol": "nmea",
+    "port": "/dev/ttyAMA0",
+    "baudrate": 115200
+  }
+}
+```
+
+**Power Requirements:**
+- Raspberry Pi Zero / Zero 2 W: 500-1000mA @ 5V
+- AI Box + 256CA: ~500mA @ 5V
+- **Total: 2.5A BEC recommended**
+
+---
+
 ## Power Distribution Guidelines
 
 ### BEC Selection
@@ -574,6 +665,7 @@ param show SERIAL2_BAUD
 | 2 | BF/iNav | I2C | TX + USB | 2A | Outdoor 50m |
 | 3 | ArduPilot | I2C | TX+RX | 3A | Missions 100m |
 | 4 | Any | Analog USB | TX | 3A | FPV + Flow |
+| 5 | Any | 256CA + AI Box | USB / TCP | 2.5A | Plug & Play Flow |
 
 ### Connection Priority
 

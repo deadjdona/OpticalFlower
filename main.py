@@ -235,26 +235,26 @@ def main():
         app = BetaflyStabilization(args.config)
         
         if app.stabilizer.initialize():
-            logger.info("✓ Hardware initialization successful")
+            logger.info("[OK] Hardware initialization successful")
             
             # Test camera
             app.stabilizer.camera.start_capture()
             time.sleep(1)
             frame = app.stabilizer.camera.get_frame()
             if frame is not None:
-                logger.info(f"✓ Camera capture working: {frame.shape}")
+                logger.info(f"[OK] Camera capture working: {frame.shape}")
             else:
-                logger.error("✗ Camera capture failed")
+                logger.error("[FAIL] Camera capture failed")
                 
             # Test servos
             logger.info("Testing servo sweep...")
             app.stabilizer.servos.sweep_test('both', duration=3.0)
-            logger.info("✓ Servo control working")
+            logger.info("[OK] Servo control working")
             
             app.stabilizer.cleanup()
             logger.info("System test complete!")
         else:
-            logger.error("✗ Hardware initialization failed")
+            logger.error("[FAIL] Hardware initialization failed")
             
         return 0
         
