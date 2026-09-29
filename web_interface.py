@@ -8,7 +8,6 @@ from flask import Flask, render_template, jsonify, request, send_from_directory
 from flask_cors import CORS
 import json
 import os
-import copy
 import threading
 import time
 from typing import Optional
@@ -70,14 +69,10 @@ def update_config():
         if not validate_config(new_config):
             return jsonify({'success': False, 'error': 'Invalid configuration'}), 400
         
-        # Save to file atomically to prevent corruption on sudden power loss
+        # Save to file
         with config_lock:
-            temp_file = f"{CONFIG_FILE}.tmp"
-            with open(temp_file, 'w') as f:
+            with open(CONFIG_FILE, 'w') as f:
                 json.dump(new_config, f, indent=2)
-                f.flush()
-                os.fsync(f.fileno())
-            os.replace(temp_file, CONFIG_FILE)
         
         logger.info("Configuration updated via web interface")
         return jsonify({'success': True, 'message': 'Configuration saved'})
@@ -91,11 +86,10 @@ def update_config():
 def get_state():
     """Get current system state"""
     with state_lock:
-        state_snapshot = copy.deepcopy(system_state)
-    return jsonify({
-        'success': True,
-        'state': state_snapshot
-    })
+        return jsonify({
+            'success': True,
+            'state': system_state.copy()
+        })
 
 
 @app.route('/api/command', methods=['POST'])

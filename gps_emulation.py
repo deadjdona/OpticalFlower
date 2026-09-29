@@ -8,7 +8,7 @@ import time
 import logging
 import serial
 from typing import Optional, Tuple
-from datetime import datetime, timezone
+from datetime import datetime
 import math
 
 logging.basicConfig(level=logging.INFO)
@@ -195,7 +195,7 @@ class NMEAGPSEmulator(GPSEmulator):
         self.update_velocity(vel_x, vel_y)
         
         # Get current UTC time
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         time_str = now.strftime("%H%M%S.%f")[:-4]  # HHMMSS.SS
         date_str = now.strftime("%d%m%y")  # DDMMYY
         

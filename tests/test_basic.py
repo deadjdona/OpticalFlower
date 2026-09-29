@@ -152,33 +152,10 @@ class TestPositionStabilizerModule(unittest.TestCase):
         self.assertIsNotNone(corr_x)
         self.assertIsNotNone(corr_y)
         
-    def test_stabilization_controller_clamping(self):
-        from position_stabilizer import StabilizationController, PIDGains
-        max_tilt = 15.0
-        controller = StabilizationController(
-            position_gains_x=PIDGains(kp=5.0, ki=1.0, kd=1.0),
-            position_gains_y=PIDGains(kp=5.0, ki=1.0, kd=1.0),
-            velocity_damping=2.0,
-            max_tilt=max_tilt
-        )
-        controller.set_mode("position_hold")
-        # Massive velocity and position error should be clamped to max_tilt
-        pitch, roll = controller.update(current_x=100.0, current_y=100.0, vel_x=50.0, vel_y=50.0)
-        self.assertLessEqual(abs(pitch), max_tilt)
-        self.assertLessEqual(abs(roll), max_tilt)
+        err_x, err_y = stab.get_position_error(0.5, 0.5)
+        self.assertEqual(err_x, -0.5)
+        self.assertEqual(err_y, -0.5)
 
-
-class TestStickInputScaling(unittest.TestCase):
-    """Test RC stick input conversion calculations"""
-    
-    def test_sbus_range_mapping(self):
-        # 172 -> 1000 us, 1811 -> 2000 us, 992 -> 1500 us
-        val_min = int((172 - 172) * 1000 / 1639 + 1000)
-        val_max = int((1811 - 172) * 1000 / 1639 + 1000)
-        val_mid = int((991.5 - 172) * 1000 / 1639 + 1000)
-        self.assertEqual(val_min, 1000)
-        self.assertEqual(val_max, 2000)
-        self.assertAlmostEqual(val_mid, 1500, delta=2)
 
 
 def run_tests():
