@@ -293,6 +293,45 @@ class TestSensorFactory(unittest.TestCase):
             create_sensor({'sensor': {'type': 'quantum_teleporter'}})
 
 
+class TestCaddxInfra256CA(unittest.TestCase):
+    """Test Caddx Infra 256CA packet parsing and rotation logic"""
+
+    def test_packet_parsing_and_rotation(self):
+        import threading
+        from caddx_infra256ca import CaddxInfra256CA
+        driver = CaddxInfra256CA.__new__(CaddxInfra256CA)
+        driver.data_format = "auto"
+        driver.KEY_ALIASES = CaddxInfra256CA.KEY_ALIASES
+        driver.rotation = 90
+        driver.height_scale = 1.0
+        driver.height_smoothing = 0.2
+        driver._lock = threading.Lock()
+        driver._last_motion = (0, 0)
+        driver._last_quality = 0
+        driver._last_height_raw = None
+        driver._height_filtered = None
+        driver._last_update_time = 0.0
+
+        # Parse JSON packet
+        packet = driver._parse_packet('{"dx": 10, "dy": -20, "quality": 150, "height": 2.5}')
+        self.assertIsNotNone(packet)
+        self.assertEqual(packet['dx'], 10)
+        self.assertEqual(packet['dy'], -20)
+        self.assertEqual(packet['quality'], 150)
+        self.assertEqual(packet['height'], 2.5)
+
+        # Process line with 90 deg rotation: (dx, dy) -> (y, -x)
+        driver._process_line('{"dx": 10, "dy": -20, "quality": 150, "height": 2.5}')
+        dx_rot, dy_rot = driver._last_motion
+        self.assertEqual(dx_rot, -20)
+        self.assertEqual(dy_rot, -10)
+        self.assertEqual(driver.get_surface_quality(), 150)
+        self.assertEqual(driver.get_height_estimate(), 2.5)
+
+        # Check shutdown/stop alias
+        self.assertEqual(driver.shutdown, driver.stop)
+
+
 def run_tests():
     """Run all tests"""
     unittest.main(argv=[''], exit=False, verbosity=2)
