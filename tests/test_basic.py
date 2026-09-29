@@ -181,6 +181,118 @@ class TestStickInputScaling(unittest.TestCase):
         self.assertAlmostEqual(val_mid, 1500, delta=2)
 
 
+class TestConfigValidation(unittest.TestCase):
+    """Test configuration schema validation in web_interface"""
+
+    def setUp(self):
+        self.valid_cfg = {
+            'sensor': {'type': 'pmw3901'},
+            'tracker': {'scale_factor': 0.001, 'initial_height': 0.5},
+            'pid': {
+                'position_x': {'kp': 0.5, 'ki': 0.1, 'kd': 0.2},
+                'position_y': {'kp': 0.5, 'ki': 0.1, 'kd': 0.2}
+            },
+            'stabilizer': {'max_tilt_angle': 15.0},
+            'control': {'update_rate_hz': 50}
+        }
+
+    def test_valid_config(self):
+        from web_interface import validate_config
+        is_valid, msg = validate_config(self.valid_cfg)
+        self.assertTrue(is_valid)
+        self.assertIn("Valid", msg)
+
+    def test_missing_section(self):
+        from web_interface import validate_config
+        cfg = self.valid_cfg.copy()
+        del cfg['control']
+        is_valid, msg = validate_config(cfg)
+        self.assertFalse(is_valid)
+        self.assertIn("control", msg)
+
+    def test_invalid_sensor_type(self):
+        from web_interface import validate_config
+        import copy
+        cfg = copy.deepcopy(self.valid_cfg)
+        cfg['sensor']['type'] = 'magic_nonexistent_sensor'
+        is_valid, msg = validate_config(cfg)
+        self.assertFalse(is_valid)
+        self.assertIn("Invalid or missing sensor type", msg)
+
+    def test_invalid_bounds(self):
+        from web_interface import validate_config
+        import copy
+        cfg = copy.deepcopy(self.valid_cfg)
+        cfg['control']['update_rate_hz'] = -10
+        is_valid, msg = validate_config(cfg)
+        self.assertFalse(is_valid)
+        self.assertIn("update_rate_hz", msg)
+
+
+class TestVelocityDamper(unittest.TestCase):
+    """Test velocity damper calculations and altitude adaptation"""
+
+    def test_damping_computation(self):
+        from position_stabilizer import VelocityDamper
+        damper = VelocityDamper(
+            damping_factor=0.3,
+            max_correction=10.0,
+            altitude_adaptive=True,
+            high_altitude_boost=0.5
+        )
+        # Normal altitude (5m)
+        pitch, roll = damper.compute_damping(vel_x=2.0, vel_y=1.0, altitude_m=5.0)
+        self.assertAlmostEqual(roll, -0.6)
+        self.assertAlmostEqual(pitch, -0.3)
+
+        # High altitude (40m) should have boosted damping
+        pitch_high, roll_high = damper.compute_damping(vel_x=2.0, vel_y=1.0, altitude_m=40.0)
+        self.assertLess(roll_high, roll)
+        self.assertLess(pitch_high, pitch)
+
+        # Limit clamping
+        pitch_max, roll_max = damper.compute_damping(vel_x=100.0, vel_y=100.0)
+        self.assertEqual(roll_max, -10.0)
+        self.assertEqual(pitch_max, -10.0)
+
+
+class TestGPSEmulation(unittest.TestCase):
+    """Test GPS Emulation coordinate conversion and NMEA protocol"""
+
+    def test_coordinate_conversion(self):
+        from gps_emulation import GPSEmulator
+        emu = GPSEmulator(home_lat=50.4501, home_lon=30.5234, home_alt=150.0)
+        lat, lon, alt = emu.local_to_gps(pos_x=0.0, pos_y=0.0, alt_agl=10.0)
+        self.assertAlmostEqual(lat, 50.4501, places=4)
+        self.assertAlmostEqual(lon, 30.5234, places=4)
+        self.assertEqual(alt, 160.0)
+
+    def test_velocity_and_course(self):
+        from gps_emulation import GPSEmulator
+        emu = GPSEmulator(home_lat=0.0, home_lon=0.0, home_alt=0.0)
+        emu.update_velocity(vel_x=3.0, vel_y=4.0)
+        self.assertAlmostEqual(emu.speed, 5.0, places=2)
+        self.assertGreater(emu.course, 0.0)
+
+    def test_nmea_checksum(self):
+        from gps_emulation import NMEAGPSEmulator
+        nmea_emu = NMEAGPSEmulator.__new__(NMEAGPSEmulator)
+        sentence_body = "GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,"
+        checksum = nmea_emu._calculate_checksum(sentence_body)
+        full_sentence = nmea_emu._create_nmea_sentence(sentence_body)
+        self.assertTrue(full_sentence.startswith("$GPGGA"))
+        self.assertTrue(full_sentence.endswith(f"*{checksum}\r\n"))
+
+
+class TestSensorFactory(unittest.TestCase):
+    """Test Sensor Factory dispatch and error handling"""
+
+    def test_unknown_sensor_raises(self):
+        from sensor_factory import create_sensor
+        with self.assertRaises(ValueError):
+            create_sensor({'sensor': {'type': 'quantum_teleporter'}})
+
+
 def run_tests():
     """Run all tests"""
     unittest.main(argv=[''], exit=False, verbosity=2)
