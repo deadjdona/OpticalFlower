@@ -165,37 +165,45 @@ class CameraOpticalFlow:
     def _calculate_farneback_flow(self, gray: np.ndarray) -> Tuple[float, float]:
         """
         Calculate optical flow using Farneback method (dense flow)
+        Optimized for performance on Raspberry Pi
         """
+        # Downsample for faster processing on Pi Zero
+        scale_factor = 0.5
+        small_gray = cv2.resize(gray, None, fx=scale_factor, fy=scale_factor, 
+                                interpolation=cv2.INTER_LINEAR)
+        small_prev = cv2.resize(self.prev_gray, None, fx=scale_factor, fy=scale_factor,
+                                interpolation=cv2.INTER_LINEAR)
+        
         flow = cv2.calcOpticalFlowFarneback(
-            self.prev_gray,
-            gray,
+            small_prev,
+            small_gray,
             None,
             pyr_scale=0.5,
-            levels=3,
+            levels=2,  # Reduced from 3 for speed
             winsize=15,
-            iterations=3,
+            iterations=2,  # Reduced from 3 for speed
             poly_n=5,
-            poly_sigma=1.2,
+            poly_sigma=1.1,
             flags=0
         )
         
         # Calculate average flow in center region (ignore edges)
-        h, w = gray.shape
+        h, w = small_gray.shape
         center_h = slice(h//4, 3*h//4)
         center_w = slice(w//4, 3*w//4)
         
         flow_center = flow[center_h, center_w]
         
-        # Average flow
-        flow_x = np.mean(flow_center[:, :, 0])
-        flow_y = np.mean(flow_center[:, :, 1])
+        # Average flow using median for robustness
+        flow_x = np.median(flow_center[:, :, 0])
+        flow_y = np.median(flow_center[:, :, 1])
         
-        # Scale to match PMW3901 output range
-        scale = 50.0
+        # Scale to match PMW3901 output range and account for downsampling
+        scale = 50.0 / scale_factor
         flow_x *= scale
         flow_y *= scale
         
-        return (flow_x, flow_y)
+        return (float(flow_x), float(flow_y))
     
     def _calculate_lucas_kanade_flow(self, gray: np.ndarray) -> Tuple[float, float]:
         """
@@ -354,9 +362,26 @@ class AnalogCameraFlow:
         """
         # Simple line averaging deinterlace
         deinterlaced = frame.copy()
-        deinterlaced[1::2] = (frame[0:-1:2].astype(np.float32) + 
-                              frame[2::2].astype(np.float32)) / 2
-        return deinterlaced.astype(np.uint8)
+        h, w = frame.shape[:2]
+        
+        # Ensure even height for simplicity, process rows 1, 3, ... up to h-2
+        # We average row i-1 and i+1 to get row i
+        
+        # Target rows: 1, 3, 5, ...
+        # Upper neighbors: 0, 2, 4, ...
+        # Lower neighbors: 2, 4, 6, ...
+        
+        # Use integer math for speed if uint8
+        upper = frame[0:-2:2].astype(np.uint16)
+        lower = frame[2::2].astype(np.uint16)
+        
+        # Limit to matching length
+        min_len = min(upper.shape[0], lower.shape[0])
+        
+        if min_len > 0:
+             deinterlaced[1:2*min_len:2] = ((upper[:min_len] + lower[:min_len]) // 2).astype(np.uint8)
+             
+        return deinterlaced
     
     def get_surface_quality(self) -> int:
         """Get surface quality"""
@@ -381,3 +406,100 @@ def auto_detect_camera() -> Optional[int]:
             pass
     
     return None
+
+
+class OpticalFlowTracker:
+    """
+    Higher-level optical flow tracking with position estimation for cameras
+    """
+    
+    def __init__(self, sensor, scale_factor: float = 0.001, height_m: float = 0.5):
+        """
+        Initialize optical flow tracker
+        
+        Args:
+            sensor: Camera optical flow sensor instance (CameraOpticalFlow or AnalogCameraFlow)
+            scale_factor: Conversion factor from sensor units to meters
+            height_m: Height above ground in meters (affects scale)
+        """
+        self.sensor = sensor
+        self.scale_factor = scale_factor
+        self.height_m = height_m
+        
+        # Position tracking
+        self.pos_x = 0.0
+        self.pos_y = 0.0
+        
+        # Velocity tracking
+        self.vel_x = 0.0
+        self.vel_y = 0.0
+        
+        self.last_update_time = time.time()
+        
+        # Moving average filter for noise reduction
+        self.velocity_history_x = []
+        self.velocity_history_y = []
+        self.filter_window = 5
+    
+    def update(self) -> Tuple[float, float]:
+        """
+        Update position estimate based on optical flow
+        
+        Returns:
+            Current estimated position (x, y) in meters
+        """
+        current_time = time.time()
+        dt = current_time - self.last_update_time
+        
+        if dt < 0.001:  # Avoid division by zero
+            return (self.pos_x, self.pos_y)
+        
+        # Get raw motion from sensor
+        delta_x, delta_y = self.sensor.get_motion()
+        
+        # Convert to velocity (m/s) accounting for height
+        # Optical flow scales with height above ground
+        scale = self.scale_factor * self.height_m
+        self.vel_x = (delta_x * scale) / dt
+        self.vel_y = (delta_y * scale) / dt
+        
+        # Apply moving average filter
+        self.velocity_history_x.append(self.vel_x)
+        self.velocity_history_y.append(self.vel_y)
+        
+        if len(self.velocity_history_x) > self.filter_window:
+            self.velocity_history_x.pop(0)
+            self.velocity_history_y.pop(0)
+        
+        filtered_vel_x = sum(self.velocity_history_x) / len(self.velocity_history_x)
+        filtered_vel_y = sum(self.velocity_history_y) / len(self.velocity_history_y)
+        
+        # Integrate velocity to get position
+        self.pos_x += filtered_vel_x * dt
+        self.pos_y += filtered_vel_y * dt
+        
+        self.last_update_time = current_time
+        
+        return (self.pos_x, self.pos_y)
+    
+    def get_velocity(self) -> Tuple[float, float]:
+        """Get current velocity estimate in m/s"""
+        filtered_vel_x = sum(self.velocity_history_x) / max(len(self.velocity_history_x), 1)
+        filtered_vel_y = sum(self.velocity_history_y) / max(len(self.velocity_history_y), 1)
+        return (filtered_vel_x, filtered_vel_y)
+    
+    def reset_position(self):
+        """Reset position to origin"""
+        self.pos_x = 0.0
+        self.pos_y = 0.0
+        self.velocity_history_x.clear()
+        self.velocity_history_y.clear()
+        logger.info("Position reset to origin")
+    
+    def set_height(self, height_m: float):
+        """Update height above ground for accurate scaling"""
+        self.height_m = height_m
+    
+    def get_surface_quality(self) -> int:
+        """Get surface quality from sensor"""
+        return self.sensor.get_surface_quality()

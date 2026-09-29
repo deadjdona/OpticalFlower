@@ -1,5 +1,5 @@
 #!/bin/bash
-# Setup script for Betafly Optical Position Stabilization
+# Setup script for Betafly Camera-Based Position Stabilization
 # Run this script on your Raspberry Pi Zero
 
 set -e
@@ -34,19 +34,33 @@ sudo apt-get install -y \
     git
 
 # venv for pip
-echo "[2.5/6] Installing venv"
-
-# python -m venv --system-site-packages optic
+echo "[2.5/6] Setting up Python virtual environment..."
+if [ ! -d "optic" ]; then
+    python3 -m venv --system-site-packages optic
+fi
 source optic/bin/activate
 
+# Enable hardware interfaces
+echo "[3/6] Enabling hardware interfaces (SPI and Camera)..."
+REBOOT_REQUIRED=0
+
 # Enable SPI
-echo "[3/6] Enabling SPI interface..."
 if ! grep -q "^dtparam=spi=on" /boot/config.txt; then
     echo "dtparam=spi=on" | sudo tee -a /boot/config.txt
     echo "SPI enabled (reboot required)"
     REBOOT_REQUIRED=1
 else
     echo "SPI already enabled"
+fi
+
+# Enable Camera
+if ! grep -q "^start_x=1" /boot/config.txt; then
+    echo "start_x=1" | sudo tee -a /boot/config.txt
+    echo "gpu_mem=128" | sudo tee -a /boot/config.txt
+    echo "Camera enabled (reboot required)"
+    REBOOT_REQUIRED=1
+else
+    echo "Camera already enabled"
 fi
 
 # Install Python dependencies
@@ -56,12 +70,12 @@ pip3 install -r requirements.txt
 
 # Make scripts executable
 echo "[5/6] Setting file permissions..."
-chmod +x betafly_stabilizer.py
+chmod +x betafly_stabilizer.py betafly_stabilizer_advanced.py main.py calibrate.py calibrate_thermal.py test_sensor.py setup.sh 2>/dev/null || chmod +x betafly_stabilizer.py
 
 # Test installation
 echo "[6/6] Testing installation..."
-python3 -c "import spidev; print('✓ spidev installed')"
-python3 -c "from optical_flow_sensor import PMW3901; print('✓ optical_flow_sensor OK')"
+python3 -c "import cv2; print('✓ OpenCV installed')"
+python3 -c "from camera_optical_flow import CameraOpticalFlow; print('✓ camera_optical_flow OK')"
 python3 -c "from position_stabilizer import StabilizationController; print('✓ position_stabilizer OK')"
 
 echo ""
@@ -71,7 +85,7 @@ echo "================================================"
 echo ""
 
 if [ "$REBOOT_REQUIRED" = "1" ]; then
-    echo "⚠️  REBOOT REQUIRED to enable SPI interface"
+    echo "⚠️  REBOOT REQUIRED to enable Camera interface"
     echo ""
     read -p "Reboot now? (y/n) " -n 1 -r
     echo
@@ -81,6 +95,8 @@ if [ "$REBOOT_REQUIRED" = "1" ]; then
 else
     echo "✓ All set! You can now run:"
     echo "  ./betafly_stabilizer.py --help"
+    echo "  or"
+    echo "  ./betafly_stabilizer_advanced.py"
 fi
 
 echo ""
