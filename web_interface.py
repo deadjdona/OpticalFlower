@@ -11,7 +11,7 @@ import os
 import copy
 import threading
 import time
-from typing import Optional, Tuple, Dict, Any
+from typing import Optional
 import logging
 from queue import Queue
 
@@ -67,9 +67,8 @@ def update_config():
         new_config = request.json
         
         # Validate config
-        is_valid, err_msg = validate_config(new_config)
-        if not is_valid:
-            return jsonify({'success': False, 'error': f'Invalid configuration: {err_msg}'}), 400
+        if not validate_config(new_config):
+            return jsonify({'success': False, 'error': 'Invalid configuration'}), 400
         
         # Save to file atomically to prevent corruption on sudden power loss
         with config_lock:
@@ -165,64 +164,10 @@ def get_camera_types():
     return jsonify({'success': True, 'cameras': camera_types})
 
 
-def validate_config(config: Any) -> Tuple[bool, str]:
-    """
-    Validate configuration structure, data types, and value bounds.
-    
-    Args:
-        config: Configuration dictionary to validate
-        
-    Returns:
-        Tuple of (is_valid: bool, error_message: str)
-    """
-    if not isinstance(config, dict):
-        return False, "Configuration must be a JSON object"
-        
+def validate_config(config):
+    """Validate configuration structure"""
     required_keys = ['sensor', 'tracker', 'pid', 'stabilizer', 'control']
-    for key in required_keys:
-        if key not in config:
-            return False, f"Missing required configuration section: '{key}'"
-        if not isinstance(config[key], dict):
-            return False, f"Section '{key}' must be an object"
-            
-    # Sensor checks
-    sensor_cfg = config['sensor']
-    valid_sensors = {
-        'pmw3901', 'caddx_infra256', 'caddx_infra256ca',
-        'usb_camera', 'csi_camera', 'analog_usb', 'opencv_any'
-    }
-    sensor_type = sensor_cfg.get('type')
-    if not sensor_type or sensor_type not in valid_sensors:
-        return False, f"Invalid or missing sensor type: {sensor_type}. Must be one of {sorted(valid_sensors)}"
-        
-    # Tracker checks
-    tracker_cfg = config['tracker']
-    scale_factor = tracker_cfg.get('scale_factor', 0.001)
-    if not isinstance(scale_factor, (int, float)) or scale_factor <= 0:
-        return False, "tracker.scale_factor must be a positive number"
-        
-    initial_height = tracker_cfg.get('initial_height', 0.5)
-    if not isinstance(initial_height, (int, float)) or initial_height <= 0:
-        return False, "tracker.initial_height must be a positive number"
-        
-    # Control checks
-    control_cfg = config['control']
-    update_rate = control_cfg.get('update_rate_hz', 50)
-    if not isinstance(update_rate, (int, float)) or update_rate <= 0 or update_rate > 500:
-        return False, "control.update_rate_hz must be between 1 and 500 Hz"
-        
-    # PID checks
-    pid_cfg = config['pid']
-    for axis in ['position_x', 'position_y']:
-        if axis in pid_cfg:
-            axis_cfg = pid_cfg[axis]
-            if not isinstance(axis_cfg, dict):
-                return False, f"pid.{axis} must be an object"
-            for gain in ['kp', 'ki', 'kd']:
-                if gain in axis_cfg and not isinstance(axis_cfg[gain], (int, float)):
-                    return False, f"pid.{axis}.{gain} must be a number"
-                    
-    return True, "Valid configuration"
+    return all(key in config for key in required_keys)
 
 
 def update_system_state(stabilizer_instance):

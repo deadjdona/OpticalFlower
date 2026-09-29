@@ -15,8 +15,7 @@ import logging
 from typing import Optional
 import json
 
-from optical_flow_sensor import OpticalFlowTracker
-from sensor_factory import create_sensor
+from optical_flow_sensor import PMW3901, OpticalFlowTracker, CaddxInfra256, CADDX_AVAILABLE
 from position_stabilizer import (
     StabilizationController, 
     PIDGains
@@ -45,8 +44,26 @@ class BetaflyStabilizer:
         # Load configuration
         self.config = self._load_config(config_file)
         
-        # Initialize optical flow sensor via sensor factory
-        self.sensor = create_sensor(self.config)
+        # Initialize optical flow sensor
+        sensor_type = self.config['sensor'].get('type', 'pmw3901')
+        logger.info(f"Initializing optical flow sensor (Type: {sensor_type})...")
+        
+        if sensor_type == 'caddx_infra256':
+            if not CADDX_AVAILABLE:
+                raise RuntimeError("Caddx Infra 256 selected but not available (check imports/dependencies)")
+            
+            self.sensor = CaddxInfra256(
+                bus_number=self.config['sensor'].get('i2c_bus', 1),
+                address=self.config['sensor'].get('i2c_address', 0x29),
+                rotation=self.config['sensor'].get('rotation', 0)
+            )
+        else:
+            # Default to PMW3901
+            self.sensor = PMW3901(
+                spi_bus=self.config['sensor'].get('spi_bus', 0),
+                spi_device=self.config['sensor'].get('spi_device', 0),
+                rotation=self.config['sensor'].get('rotation', 0)
+            )
         
         # Initialize optical flow tracker
         self.tracker = OpticalFlowTracker(
@@ -164,10 +181,7 @@ class BetaflyStabilizer:
         self.running = False
         
         # Shutdown sensor
-        if hasattr(self.sensor, 'shutdown'):
-            self.sensor.shutdown()
-        elif hasattr(self.sensor, 'stop'):
-            self.sensor.stop()
+        self.sensor.shutdown()
         
         # Close log file
         if self.log_file:

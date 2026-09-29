@@ -123,8 +123,6 @@ class CameraOpticalFlow:
             self.cap.release()
         logger.info("Camera capture stopped")
     
-    shutdown = stop
-    
     def _capture_loop(self):
         """Continuous capture loop"""
         while self.running:
@@ -339,8 +337,6 @@ class AnalogCameraFlow:
         """Stop capture"""
         self.optical_flow.stop()
     
-    shutdown = stop
-    
     def get_motion(self) -> Tuple[float, float]:
         """Get motion with analog video preprocessing"""
         # Get frame
@@ -406,8 +402,8 @@ def auto_detect_camera() -> Optional[int]:
                 if ret:
                     logger.info(f"Camera detected at ID {camera_id}")
                     return camera_id
-        except Exception as e:
-            logger.debug(f"Camera probe failed for ID {camera_id}: {e}")
+        except:
+            pass
     
     return None
 
