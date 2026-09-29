@@ -86,7 +86,18 @@ vcgencmd get_camera
 # Should output: supported=1 detected=1
 ```
 
+<<<<<<< HEAD
+Expected output:
+
+```bash
+✓ Sensor initialized successfully
+✓ Product ID: 0x49
+```
+
+### 2. Test Motion Detection
+=======
 ### 2. Test Python Camera Access
+>>>>>>> flowr/main
 
 ```bash
 python3 -c "
@@ -181,6 +192,11 @@ sudo journalctl -u betafly-stabilizer.service -f
 
 ### Wiring: Pi Zero to Flight Controller
 
+<<<<<<< HEAD
+1. Connect Pi TX to FC RX (telemetry/UART port)
+2. Update config:
+
+=======
 Connect via UART (TX/RX):
 
 ```
@@ -210,6 +226,7 @@ sudo reboot
 ### Configure Protocol
 
 **For MAVLink (ArduPilot/PX4):**
+>>>>>>> flowr/main
 ```json
 {
   "output": {
@@ -219,8 +236,19 @@ sudo reboot
   }
 }
 ```
+<<<<<<< HEAD
+
+3. Implement `_send_corrections()` method for your protocol
+
+### Option B: PWM Output
+
+1. Connect Pi GPIO pins to FC receiver inputs
+2. Update config:
+
+=======
 
 **For MSP (Betaflight/iNav):**
+>>>>>>> flowr/main
 ```json
 {
   "output": {
@@ -231,20 +259,12 @@ sudo reboot
 }
 ```
 
-### Option B: PWM Output
-
-1. Connect Pi GPIO pins to FC receiver inputs
-2. Update config:
-```json
-{
-  "output": {
-    "interface": "pwm"
-  }
-}
-```
+<<<<<<< HEAD
 3. Install pigpio: `sudo apt-get install pigpio python3-pigpio`
-
+4. Implement PWM generation in `_send_corrections()`
+=======
 **See [WIRING_GUIDE.md](WIRING_GUIDE.md) for complete wiring instructions and flight controller configuration.**
+>>>>>>> flowr/main
 
 ## Initial Flight Test
 

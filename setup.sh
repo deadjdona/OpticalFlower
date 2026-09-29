@@ -33,31 +33,26 @@ sudo apt-get install -y \
     python3-dev \
     git
 
+<<<<<<< HEAD
 # venv for pip
-echo "[2.5/6] Setting up Python virtual environment..."
-if [ ! -d "optic" ]; then
-    python3 -m venv --system-site-packages optic
-fi
+echo "[2.5/6] Installing venv"
+
+# python -m venv --system-site-packages optic
 source optic/bin/activate
 
-# Enable hardware interfaces
-echo "[3/6] Enabling hardware interfaces (SPI and Camera)..."
-REBOOT_REQUIRED=0
-
 # Enable SPI
+echo "[3/6] Enabling SPI interface..."
 if ! grep -q "^dtparam=spi=on" /boot/config.txt; then
     echo "dtparam=spi=on" | sudo tee -a /boot/config.txt
     echo "SPI enabled (reboot required)"
-    REBOOT_REQUIRED=1
-else
-    echo "SPI already enabled"
-fi
-
+=======
 # Enable Camera
+echo "[3/6] Enabling Camera interface..."
 if ! grep -q "^start_x=1" /boot/config.txt; then
     echo "start_x=1" | sudo tee -a /boot/config.txt
     echo "gpu_mem=128" | sudo tee -a /boot/config.txt
     echo "Camera enabled (reboot required)"
+>>>>>>> flowr/main
     REBOOT_REQUIRED=1
 else
     echo "Camera already enabled"
@@ -70,7 +65,7 @@ pip3 install -r requirements.txt
 
 # Make scripts executable
 echo "[5/6] Setting file permissions..."
-chmod +x betafly_stabilizer.py betafly_stabilizer_advanced.py main.py calibrate.py calibrate_thermal.py test_sensor.py setup.sh 2>/dev/null || chmod +x betafly_stabilizer.py
+chmod +x betafly_stabilizer.py
 
 # Test installation
 echo "[6/6] Testing installation..."
