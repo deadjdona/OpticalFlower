@@ -111,6 +111,53 @@ class TestSystemIntegration(unittest.TestCase):
         self.assertIsInstance(config.pan_kp, float)
 
 
+class TestPositionStabilizerModule(unittest.TestCase):
+    """Test position_stabilizer module classes"""
+    
+    def test_pid_controller(self):
+        from position_stabilizer import PIDController, PIDGains
+        gains = PIDGains(kp=1.0, ki=0.1, kd=0.05)
+        pid = PIDController(gains, output_limits=(-1.0, 1.0))
+        
+        # First call returns 0
+        out0 = pid.update(10.0, 0.0, current_time=1.0)
+        self.assertEqual(out0, 0.0)
+        
+        # Subsequent call computes output
+        out1 = pid.update(10.0, 0.0, current_time=1.05)
+        self.assertGreater(out1, 0.0)
+        self.assertLessEqual(out1, 1.0)
+        
+        # dt <= 0 should return 0.0 safely
+        out2 = pid.update(10.0, 0.0, current_time=1.05)
+        self.assertEqual(out2, 0.0)
+        
+        # Reset clears state
+        pid.reset()
+        self.assertEqual(pid.integral, 0.0)
+        self.assertIsNone(pid.prev_time)
+
+    def test_position_stabilizer(self):
+        from position_stabilizer import PositionStabilizer
+        stab = PositionStabilizer()
+        
+        # When disabled, corrections are 0.0
+        corr_x, corr_y = stab.update(1.0, 2.0)
+        self.assertEqual(corr_x, 0.0)
+        self.assertEqual(corr_y, 0.0)
+        
+        # When enabled, calculates corrections
+        stab.enable()
+        corr_x, corr_y = stab.update(1.0, 2.0)
+        self.assertIsNotNone(corr_x)
+        self.assertIsNotNone(corr_y)
+        
+        err_x, err_y = stab.get_position_error(0.5, 0.5)
+        self.assertEqual(err_x, -0.5)
+        self.assertEqual(err_y, -0.5)
+
+
+
 def run_tests():
     """Run all tests"""
     unittest.main(argv=[''], exit=False, verbosity=2)
