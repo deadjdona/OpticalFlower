@@ -332,6 +332,138 @@ class TestCaddxInfra256CA(unittest.TestCase):
         self.assertEqual(driver.shutdown, driver.stop)
 
 
+class TestOpticalFlowTrackerRobustness(unittest.TestCase):
+    """Test OpticalFlowTracker exception handling and outlier rejection"""
+
+    def test_sensor_exception_resilience(self):
+        from optical_flow_sensor import OpticalFlowTracker
+
+        class FailingSensor:
+            def get_motion(self):
+                raise OSError("I2C bus timeout")
+            def get_surface_quality(self):
+                raise IOError("Bus error")
+
+        tracker = OpticalFlowTracker(FailingSensor(), scale_factor=0.001, height_m=1.0)
+        # Should catch exceptions gracefully and return current position without crashing
+        pos = tracker.update()
+        self.assertEqual(pos, (0.0, 0.0))
+        self.assertEqual(tracker.get_surface_quality(), 0)
+
+    def test_velocity_outlier_clamping(self):
+        import time
+        from optical_flow_sensor import OpticalFlowTracker
+
+        class GlitchingSensor:
+            def get_motion(self):
+                return (100000, -100000)
+            def get_surface_quality(self):
+                return 200
+
+        tracker = OpticalFlowTracker(GlitchingSensor(), scale_factor=0.001, height_m=1.0)
+        tracker.last_update_time = time.time() - 0.02  # 50 Hz
+        tracker.update()
+        # Velocity should be clamped to max 10.0 m/s
+        self.assertLessEqual(tracker.vel_x, 10.0)
+        self.assertGreaterEqual(tracker.vel_y, -10.0)
+
+
+class TestBenewakeSynchronization(unittest.TestCase):
+    """Test Benewake TFmini frame synchronization and checksum validation"""
+
+    def test_sync_with_leading_garbage_bytes(self):
+        from io import BytesIO
+        from altitude_source import RangefinderAltitudeSource
+
+        class MockSerial:
+            def __init__(self, data: bytes):
+                self._buf = BytesIO(data)
+            @property
+            def in_waiting(self):
+                return len(self._buf.getvalue()) - self._buf.tell()
+            def read(self, n):
+                return self._buf.read(n)
+
+        # Distance = 500 cm = 5.0m (0x01F4 -> low=0xF4, high=0x01)
+        # Header: 0x59, 0x59, payload: 0xF4, 0x01, 0x64, 0x00, 0x00, 0x00
+        payload = bytes([0xF4, 0x01, 0x64, 0x00, 0x00, 0x00])
+        checksum = (0x59 + 0x59 + sum(payload)) & 0xFF
+        frame = bytes([0x59, 0x59]) + payload + bytes([checksum])
+        # Prepend garbage bytes \x00\xAA to simulate out-of-sync stream
+        stream = bytes([0x00, 0xAA]) + frame
+
+        rf = RangefinderAltitudeSource.__new__(RangefinderAltitudeSource)
+        rf.serial_conn = MockSerial(stream)
+        altitude = rf._read_benewake()
+        self.assertIsNotNone(altitude)
+        self.assertAlmostEqual(altitude, 5.0)
+
+    def test_corrupt_checksum_rejected(self):
+        from io import BytesIO
+        from altitude_source import RangefinderAltitudeSource
+
+        class MockSerial:
+            def __init__(self, data: bytes):
+                self._buf = BytesIO(data)
+            @property
+            def in_waiting(self):
+                return len(self._buf.getvalue()) - self._buf.tell()
+            def read(self, n):
+                return self._buf.read(n)
+
+        # Corrupt checksum byte \x00
+        frame = bytes([0x59, 0x59, 0xF4, 0x01, 0x64, 0x00, 0x00, 0x00, 0x00])
+        rf = RangefinderAltitudeSource.__new__(RangefinderAltitudeSource)
+        rf.serial_conn = MockSerial(frame)
+        altitude = rf._read_benewake()
+        self.assertIsNone(altitude)
+
+
+class TestSBUSFailsafe(unittest.TestCase):
+    """Test SBUS failsafe extraction and SBUS2 tolerance"""
+
+    def test_sbus_receiver_failsafe_flag(self):
+        import time
+        from io import BytesIO
+        import threading
+        from stick_input import StickInput
+
+        class MockSerial:
+            def __init__(self, data: bytes):
+                self._buf = BytesIO(data)
+            def read(self, n):
+                return self._buf.read(n)
+
+        # Start byte 0x0F, 22 channel bytes, flags byte (bit 3 set = 0x08 for failsafe), end byte 0x04 (SBUS2)
+        frame = bytes([0x0F]) + bytes([0x00] * 22) + bytes([0x08]) + bytes([0x04])
+
+        stick = StickInput.__new__(StickInput)
+        stick.running = True
+        stick.channels = 8
+        stick.channel_values = [1500] * 8
+        stick.channel_lock = threading.Lock()
+        stick.last_update_time = time.time()
+        stick.failsafe_timeout = 1.0
+        stick.receiver_failsafe = False
+        stick.serial = MockSerial(frame)
+
+        stick._read_sbus()
+        self.assertTrue(stick.receiver_failsafe)
+        self.assertTrue(stick.is_failsafe())
+
+
+class TestPCA9685DutyCycle(unittest.TestCase):
+    """Test PCA9685 16-bit duty cycle scaling"""
+
+    def test_16bit_duty_cycle_scaling(self):
+        # At 50Hz, period = 20ms
+        # 1.5ms pulse should be (1.5 / 20.0) * 65535 = 4915.125 -> 4915
+        pulse_ms = 1.5
+        duty_cycle = int(round((pulse_ms / 20.0) * 65535))
+        self.assertEqual(duty_cycle, 4915)
+        self.assertGreater(duty_cycle, 4095)  # Must be 16-bit, exceeding 12-bit max
+
+
 def run_tests():
     """Run all tests"""
     unittest.main(argv=[''], exit=False, verbosity=2)

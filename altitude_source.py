@@ -262,22 +262,34 @@ class RangefinderAltitudeSource(AltitudeSource):
             return self.last_altitude
     
     def _read_benewake(self) -> Optional[float]:
-        """Read TF-mini / TFmini Plus rangefinder (Benewake protocol)"""
-        if self.serial_conn.in_waiting >= 9:
-            data = self.serial_conn.read(9)
+        """Read TF-mini / TFmini Plus rangefinder with frame sync and checksum verification"""
+        while self.serial_conn.in_waiting >= 9:
+            b1 = self.serial_conn.read(1)
+            if not b1 or b1[0] != 0x59:
+                continue
             
-            # Check header
-            if data[0] == 0x59 and data[1] == 0x59:
-                # Distance in cm (little endian)
-                distance_cm = data[2] + (data[3] << 8)
-                return distance_cm / 100.0  # Convert to meters
+            b2 = self.serial_conn.read(1)
+            if not b2 or b2[0] != 0x59:
+                continue
+            
+            payload = self.serial_conn.read(7)
+            if len(payload) != 7:
+                break
+            
+            # Verify 8-bit checksum: sum of first 8 bytes & 0xFF == byte 9
+            expected_checksum = (0x59 + 0x59 + sum(payload[:6])) & 0xFF
+            if expected_checksum == payload[6]:
+                distance_cm = payload[0] | (payload[1] << 8)
+                return distance_cm / 100.0  # Convert cm to meters
+            else:
+                logger.debug("Benewake rangefinder checksum mismatch")
         
         return None
     
     def _read_lightware(self) -> Optional[float]:
         """Read LightWare rangefinder (ASCII protocol)"""
         if self.serial_conn.in_waiting > 0:
-            line = self.serial_conn.readline().decode('ascii').strip()
+            line = self.serial_conn.readline().decode('ascii', errors='ignore').strip()
             try:
                 # LightWare outputs distance in meters directly
                 distance_m = float(line)

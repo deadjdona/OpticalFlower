@@ -138,10 +138,12 @@ class CaddxInfra256CA:
     def shutdown(self):
         """Stop reader thread and close any open connections."""
         self._running = False
+        self._close_connections()
         if self._reader_thread.is_alive():
             self._reader_thread.join(timeout=1.5)
-        self._close_connections()
         logger.info("Caddx Infra 256CA AI Box reader stopped")
+
+    stop = shutdown
 
     # ---------------------------------------------------------------- Internal helpers
     def _reader_loop(self):
@@ -177,11 +179,16 @@ class CaddxInfra256CA:
 
     def _open_serial(self):
         """Attempt to open serial device."""
+        if not SERIAL_AVAILABLE:
+            logger.error("pyserial is not installed; cannot connect to serial AI Box")
+            time.sleep(1.0)
+            return
+
         try:
             self._serial = serial.Serial(
                 self.serial_port,
                 self.serial_baudrate,
-                timeout=1.0,
+                timeout=0.1,
             )
             logger.info(
                 "Connected to AI Box over serial %s @ %d baud",
