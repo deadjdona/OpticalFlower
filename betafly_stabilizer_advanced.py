@@ -13,8 +13,8 @@ from typing import Optional
 import json
 from threading import Thread
 
-from optical_flow_sensor import PMW3901, OpticalFlowTracker
-from camera_optical_flow import CameraOpticalFlow, AnalogCameraFlow, auto_detect_camera
+from optical_flow_sensor import OpticalFlowTracker
+from sensor_factory import create_sensor
 from position_stabilizer import StabilizationController, PIDGains
 from stick_input import StickInput, StickMixer, ModeSwitch
 from web_interface import app, system_state, state_lock, start_web_server
@@ -26,21 +26,6 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
-# Try to import Caddx Infra sensors
-try:
-    from caddx_infra256 import CaddxInfra256
-    CADDX_AVAILABLE = True
-except ImportError:
-    CADDX_AVAILABLE = False
-    logger.warning("Caddx Infra 256 support not available")
-
-try:
-    from caddx_infra256ca import CaddxInfra256CA
-    CADDX_CA_AVAILABLE = True
-except ImportError:
-    CADDX_CA_AVAILABLE = False
-    logger.warning("Caddx Infra 256CA support not available")
 
 
 class BetaflyStabilizerAdvanced:
@@ -60,73 +45,8 @@ class BetaflyStabilizerAdvanced:
         # Load configuration
         self.config = self._load_config(config_file)
         
-        # Initialize sensor based on type
-        camera_type = self.config.get('sensor', {}).get('type', 'pmw3901')
-        logger.info(f"Initializing sensor: {camera_type}")
-        
-        if camera_type == 'pmw3901':
-            self.sensor = PMW3901(
-                spi_bus=self.config['sensor']['spi_bus'],
-                spi_device=self.config['sensor']['spi_device'],
-                rotation=self.config['sensor']['rotation']
-            )
-        elif camera_type == 'caddx_infra256':
-            if not CADDX_AVAILABLE:
-                raise RuntimeError("Caddx Infra 256 support not available. Install smbus2: pip install smbus2")
-            
-            self.sensor = CaddxInfra256(
-                bus_number=self.config['sensor'].get('i2c_bus', 1),
-                address=self.config['sensor'].get('i2c_address', 0x29),
-                rotation=self.config['sensor']['rotation']
-            )
-        elif camera_type == 'caddx_infra256ca':
-            if not CADDX_CA_AVAILABLE:
-                raise RuntimeError(
-                    "Caddx Infra 256CA support not available. Install pyserial for AI Box streaming."
-                )
-
-            ai_box_cfg = self.config['sensor'].get('ai_box', {})
-            tcp_port = ai_box_cfg.get('tcp_port')
-            if tcp_port is None:
-                tcp_port = ai_box_cfg.get('port', 8899)
-
-            self.sensor = CaddxInfra256CA(
-                rotation=self.config['sensor'].get('rotation', 0),
-                connection=ai_box_cfg.get('connection', 'auto'),
-                serial_port=ai_box_cfg.get('serial_port', '/dev/ttyUSB0'),
-                serial_baudrate=int(ai_box_cfg.get('serial_baudrate', 921600)),
-                tcp_host=ai_box_cfg.get('tcp_host') or ai_box_cfg.get('host'),
-                tcp_port=int(tcp_port or 8899),
-                data_format=ai_box_cfg.get('data_format', 'auto'),
-                data_timeout=float(ai_box_cfg.get('data_timeout', 0.25)),
-                height_scale=float(ai_box_cfg.get('height_scale', 1.0)),
-                height_smoothing=float(ai_box_cfg.get('height_smoothing', 0.2)),
-            )
-        elif camera_type in ['usb_camera', 'csi_camera', 'opencv_any']:
-            camera_id = self.config.get('camera', {}).get('device', 0)
-            if camera_id == 'auto':
-                camera_id = auto_detect_camera()
-                if camera_id is None:
-                    raise RuntimeError("No camera detected")
-            
-            self.sensor = CameraOpticalFlow(
-                camera_id=camera_id,
-                width=self.config.get('camera', {}).get('width', 640),
-                height=self.config.get('camera', {}).get('height', 480),
-                fps=self.config.get('camera', {}).get('fps', 30),
-                method=self.config.get('camera', {}).get('method', 'farneback')
-            )
-            self.sensor.start()
-        elif camera_type == 'analog_usb':
-            self.sensor = AnalogCameraFlow(
-                device_path=self.config.get('camera', {}).get('device', '/dev/video0'),
-                width=self.config.get('camera', {}).get('width', 720),
-                height=self.config.get('camera', {}).get('height', 480),
-                deinterlace=self.config.get('camera', {}).get('deinterlace', True)
-            )
-            self.sensor.start()
-        else:
-            raise ValueError(f"Unknown camera type: {camera_type}")
+        # Initialize sensor via factory
+        self.sensor = create_sensor(self.config)
         
         # Initialize altitude source if enabled
         self.altitude_source = None

@@ -193,7 +193,7 @@ class StickInput:
                 bit_index += 1
             
             # Convert SBUS value (172-1811) to standard PWM (1000-2000)
-            pwm_value = int((value - 172) * 800 / 1639 + 1000)
+            pwm_value = int((value - 172) * 1000 / 1639 + 1000)
             pwm_value = max(1000, min(2000, pwm_value))
             channels.append(pwm_value)
         
