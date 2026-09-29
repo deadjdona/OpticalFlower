@@ -70,7 +70,6 @@ class StickInput:
         # Failsafe
         self.last_update_time = time.time()
         self.failsafe_timeout = 1.0  # seconds
-        self.receiver_failsafe = False
         
         # Initialize protocol handler
         if protocol == 'sbus':
@@ -174,14 +173,9 @@ class StickInput:
         if len(data) != 24:
             return
         
-        # Check end byte: standard SBUS (0x00) or SBUS2 telemetry (lower nibble 0x04)
-        if (data[23] & 0x0F) not in (0x00, 0x04):
+        # Check end byte
+        if data[23] != 0x00:
             return
-        
-        # Parse SBUS flags (byte 23, 0-indexed data[22])
-        # Bit 3: Failsafe activated, Bit 2: Frame lost
-        flags = data[22]
-        rx_failsafe = bool(flags & 0x08)
         
         # Parse channels (11 bits each, packed)
         channels = []
@@ -203,10 +197,9 @@ class StickInput:
             pwm_value = max(1000, min(2000, pwm_value))
             channels.append(pwm_value)
         
-        # Update channel values and failsafe status
+        # Update channel values
         with self.channel_lock:
             self.channel_values = channels[:self.channels]
-            self.receiver_failsafe = rx_failsafe
             self.last_update_time = time.time()
     
     def _read_pwm(self):
@@ -272,11 +265,8 @@ class StickInput:
         }
     
     def is_failsafe(self) -> bool:
-        """Check if failsafe is triggered (no recent updates or receiver failsafe flag active)"""
-        with self.channel_lock:
-            rx_failsafe = self.receiver_failsafe
-        timeout_failsafe = (time.time() - self.last_update_time) > self.failsafe_timeout
-        return timeout_failsafe or rx_failsafe
+        """Check if failsafe is triggered (no recent updates)"""
+        return (time.time() - self.last_update_time) > self.failsafe_timeout
     
     def get_switch_position(self, channel: int, positions: int = 3) -> int:
         """

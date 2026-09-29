@@ -177,10 +177,9 @@ class ServoController:
         pulse_ms = self._angle_to_pulse(angle, config)
         
         if self.pca and PCA9685_AVAILABLE:
-            # CircuitPython adafruit_pca9685 duty_cycle is 16-bit (0-65535)
+            # PCA9685 uses 12-bit resolution (0-4095)
             # At 50Hz, each cycle is 20ms
-            pulse_ticks = int(round((pulse_ms / 20.0) * 65535))
-            pulse_ticks = max(0, min(65535, pulse_ticks))
+            pulse_ticks = round((pulse_ms / 20.0) * 4095)
             self.pca.channels[pin].duty_cycle = pulse_ticks
             
         elif self.pi and PIGPIO_AVAILABLE and self.pi.connected:

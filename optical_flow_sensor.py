@@ -246,12 +246,9 @@ class OpticalFlowTracker:
         
         # Update altitude from external source if available
         if self.altitude_source:
-            try:
-                new_altitude = self.altitude_source.get_altitude()
-                if new_altitude is not None and new_altitude > 0:
-                    self.height_m = new_altitude
-            except Exception as e:
-                logger.debug(f"Altitude source read failed: {e}")
+            new_altitude = self.altitude_source.get_altitude()
+            if new_altitude is not None and new_altitude > 0:
+                self.height_m = new_altitude
         
         # Adapt filter parameters based on altitude
         self._adapt_to_altitude()
@@ -259,12 +256,8 @@ class OpticalFlowTracker:
         # Allow sensors with onboard height estimates to adjust scale in real-time
         self._update_height_from_sensor()
 
-        # Get raw motion from sensor with exception protection
-        try:
-            delta_x, delta_y = self.sensor.get_motion()
-        except Exception as e:
-            logger.warning(f"Error reading optical flow sensor: {e}")
-            delta_x, delta_y = (0, 0)
+        # Get raw motion from sensor
+        delta_x, delta_y = self.sensor.get_motion()
         
         # Get surface quality for confidence estimation
         quality = self.get_surface_quality()
@@ -278,18 +271,8 @@ class OpticalFlowTracker:
         scale = self.scale_factor * self.height_m * self.altitude_scale_compensation
         
         # Apply confidence scaling to velocities
-        raw_vel_x = (delta_x * scale) / dt * self.tracking_confidence
-        raw_vel_y = (delta_y * scale) / dt * self.tracking_confidence
-        
-        # Outlier rejection: threshold at 10 m/s (36 km/h) to suppress sensor glitches/reflection spikes
-        MAX_VELOCITY = 10.0
-        if abs(raw_vel_x) > MAX_VELOCITY or abs(raw_vel_y) > MAX_VELOCITY:
-            logger.debug(f"Velocity outlier rejected: ({raw_vel_x:.2f}, {raw_vel_y:.2f}) m/s")
-            self.vel_x = max(-MAX_VELOCITY, min(MAX_VELOCITY, raw_vel_x))
-            self.vel_y = max(-MAX_VELOCITY, min(MAX_VELOCITY, raw_vel_y))
-        else:
-            self.vel_x = raw_vel_x
-            self.vel_y = raw_vel_y
+        self.vel_x = (delta_x * scale) / dt * self.tracking_confidence
+        self.vel_y = (delta_y * scale) / dt * self.tracking_confidence
         
         # Apply adaptive moving average filter
         self.velocity_history_x.append(self.vel_x)
@@ -461,14 +444,8 @@ class OpticalFlowTracker:
         self.height_m = (1 - alpha) * self.height_m + alpha * new_height
 
     def get_surface_quality(self) -> int:
-        """Get surface quality from sensor with exception shielding"""
-        if hasattr(self.sensor, 'get_surface_quality'):
-            try:
-                return int(self.sensor.get_surface_quality())
-            except Exception as e:
-                logger.debug(f"Error reading surface quality: {e}")
-                return 0
-        return 100
+        """Get surface quality from sensor"""
+        return self.sensor.get_surface_quality()
     
     def get_tracking_confidence(self) -> float:
         """
