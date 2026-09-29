@@ -16,7 +16,7 @@ opencv-contrib-python>=4.5.0  # Additional CV algorithms ----------
 
 # Web interface
 Flask>=3.1.3       # Web server framework +++ // sudo apt install python3-flask
-Flask-CORS>=3.0.0  # Cross-origin resource sharing ++++ // sudo apt install python3-flask-cors
+Flask-CORS>=6.0.5  # Cross-origin resource sharing ++++ // sudo apt install python3-flask-cors
 
 # Optional dependencies for flight controller communication
 pymavlink>=2.4.37  # For MAVLink protocol -------- // sudo apt install python3-pymavlink
