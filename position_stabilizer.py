@@ -73,19 +73,20 @@ class PIDController:
 
         # Calculate time delta
         dt = current_time - self.prev_time
+        error = setpoint - measured
         if dt <= 0 or dt > 1.0:  # Reject invalid dt (> 1s likely system suspend)
             self.prev_time = current_time
+            self.prev_error = error
             return 0.0
             
-        error = setpoint - measured
-        
         # Proportional term
         p_term = self.kp * error
         
         # Integral term with conditional integration (anti-windup)
-        # Only integrate if output is not saturated
+        # Integrate if unsaturated OR if error tends to bring it out of saturation
         output_unsaturated = p_term + self.ki * self.integral
-        if abs(output_unsaturated) < max(abs(self.output_min), abs(self.output_max)):
+        max_limit = max(abs(self.output_min), abs(self.output_max))
+        if abs(output_unsaturated) < max_limit or (output_unsaturated >= max_limit and error < 0) or (output_unsaturated <= -max_limit and error > 0):
             self.integral += error * dt
             self.integral = max(-self.integral_limit, min(self.integral_limit, self.integral))
         i_term = self.ki * self.integral
@@ -327,6 +328,7 @@ class StabilizationController:
         self.velocity_damper = VelocityDamper(
             velocity_damping, max_tilt, altitude_adaptive, high_altitude_damping_boost
         )
+        self.max_tilt = float(max_tilt)
         
         # Mode selection
         self.mode = "off"  # "off", "velocity_damping", "position_hold"
@@ -396,6 +398,10 @@ class StabilizationController:
             pitch_pos, roll_pos = self.position_stabilizer.update(current_x, current_y)
             pitch_correction += pitch_pos
             roll_correction += roll_pos
+        
+        # Clamp combined output to max tilt angle for safe flight envelope
+        pitch_correction = max(-self.max_tilt, min(self.max_tilt, pitch_correction))
+        roll_correction = max(-self.max_tilt, min(self.max_tilt, roll_correction))
         
         return (pitch_correction, roll_correction)
     
