@@ -100,13 +100,13 @@
     "comment": "Web GUI for configuration and monitoring"
   },
   "gps_emulation": {
-    "enabled": false,
+    "enabled": true,
     "protocol": "nmea",
     "port": "/dev/ttyAMA0",
     "baudrate": 115200,
     "update_rate_hz": 5,
-    "home_lat": 0.0,
-    "home_lon": 0.0,
+    "home_lat": 10.0,
+    "home_lon": 10.0,
     "home_alt": 0.0,
     "comment": "GPS emulation: Pi appears as GPS module to flight controller. protocol: nmea (most FCs) or mavlink. Set home position at takeoff. FC does position hold using this 'GPS' data"
   }
