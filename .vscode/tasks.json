@@ -1,0 +1,38 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Install dependencies",
+      "type": "shell",
+      "command": "pip install -r requirements.txt",
+      "inAgents": true,
+      "runOptions": {
+        "runOn": "worktreeCreated"
+      }
+    },
+    {
+      "label": "Run Main App",
+      "type": "shell",
+      "command": "python main.py",
+      "inAgents": true
+    },
+    {
+      "label": "Run Web Server",
+      "type": "shell",
+      "command": "python web/server.py",
+      "inAgents": true
+    },
+    {
+      "label": "Run Tests",
+      "type": "shell",
+      "command": "python -m unittest discover tests",
+      "inAgents": true
+    },
+    {
+      "label": "Run GPS Emulator",
+      "type": "shell",
+      "command": "python gps_emulation.py",
+      "inAgents": true
+    }
+  ]
+}

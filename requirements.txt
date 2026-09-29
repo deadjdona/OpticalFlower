@@ -1,4 +1,4 @@
-# Betafly Optical Position Stabilization
+# Betafly Camera-Based Position Stabilization
 # Requirements for Raspberry Pi Zero
 
 # Core dependencies
